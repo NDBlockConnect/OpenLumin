@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "openlumin",
+  "version": "${version}",
+  "name": "OpenLumin",
+  "description": "High-performance 2D/3D rendering library for Minecraft",
+  "authors": [
+    "NDBlockConnect Team"
+  ],
+  "contact": {
+    "homepage": "https://github.com/NDBlockConnect/OpenLumin",
+    "sources": "https://github.com/NDBlockConnect/OpenLumin"
+  },
+  "license": "GPL-3.0-only",
+  "environment": "*",
+  "entrypoints": {
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": "1.16.5"
+  }
+}

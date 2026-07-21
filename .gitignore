@@ -1,0 +1,40 @@
+.gradle/
+build/
+out/
+*.iml
+*.ipr
+*.iws
+.idea/
+*.log
+
+# 各模块的构建产物
+*/build/
+*/out/
+
+# 运行时目录
+run/
+runs/
+
+# Fabric 缓存
+.fabric/
+remappedSrc/
+
+# NeoForge/Forge 缓存
+.mixin.out/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# 临时文件
+*.tmp
+*.bak
+*.swp
+*~
+
+# 用户特定配置
+.vscode/
+*.code-workspace

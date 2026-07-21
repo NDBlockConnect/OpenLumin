@@ -1,0 +1,24 @@
+modLoader = "javafml"
+loaderVersion = "[37,)"
+license = "GPL-3.0-only"
+
+[[mods]]
+modId = "openlumin"
+version = "${version}"
+displayName = "OpenLumin"
+description = "High-performance 2D/3D rendering library for Minecraft"
+authors = "NDBlockConnect Team"
+
+[[dependencies.openlumin]]
+    modId = "forge"
+    type = "required"
+    versionRange = "[37,)"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[dependencies.openlumin]]
+    modId = "minecraft"
+    type = "required"
+    versionRange = "[1.17.1,1.17.2)"
+    ordering = "NONE"
+    side = "BOTH"

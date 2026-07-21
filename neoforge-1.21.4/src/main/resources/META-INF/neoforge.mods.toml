@@ -1,0 +1,24 @@
+modLoader = "neoforge"
+loaderVersion = "[4,)"
+license = "GPL-3.0-only"
+
+[[mods]]
+modId = "openlumin"
+version = "${version}"
+displayName = "OpenLumin"
+description = "High-performance 2D/3D rendering library for Minecraft"
+authors = "NDBlockConnect Team"
+
+[[dependencies.openlumin]]
+    modId = "neoforge"
+    type = "required"
+    versionRange = "[21.4.27,)"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[dependencies.openlumin]]
+    modId = "minecraft"
+    type = "required"
+    versionRange = "[1.21.4,1.21.5)"
+    ordering = "NONE"
+    side = "BOTH"
