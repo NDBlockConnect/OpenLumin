@@ -76,8 +76,8 @@ public class ScissorUtils {
             return activeTarget.width();
         }
 
-        Minecraft Minecraft.getInstance() = Minecraft.getInstance();
-        WindowRenderState windowState = Minecraft.getInstance().gameRenderer.getGameRenderState().windowRenderState;
+        Minecraft mc = Minecraft.getInstance();
+        WindowRenderState windowState = mc.gameRenderer.getGameRenderState().windowRenderState;
         return windowState.width;
     }
 
@@ -87,8 +87,8 @@ public class ScissorUtils {
             return activeTarget.height();
         }
 
-        Minecraft Minecraft.getInstance() = Minecraft.getInstance();
-        WindowRenderState windowState = Minecraft.getInstance().gameRenderer.getGameRenderState().windowRenderState;
+        Minecraft mc = Minecraft.getInstance();
+        WindowRenderState windowState = mc.gameRenderer.getGameRenderState().windowRenderState;
         return windowState.height;
     }
 }
