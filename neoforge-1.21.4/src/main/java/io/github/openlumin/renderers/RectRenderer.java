@@ -4,14 +4,20 @@ import io.github.openlumin.LuminRenderPipelines;
 import io.github.openlumin.LuminRenderSystem;
 import io.github.openlumin.buffer.LuminRingBuffer;
 import io.github.openlumin.holders.RendererHolder;
+import io.github.openlumin.shaders.ShaderProgram;
 import io.github.openlumin.utils.render.ScissorUtils;
 import com.mojang.blaze3d.platform.GpuBuffer;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.ARGB;
+import org.lwjgl.opengl.*;
 import org.lwjgl.system.MemoryUtil;
 
 import java.awt.*;
+import java.io.IOException;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
@@ -30,7 +36,25 @@ public class RectRenderer implements IRenderer {
     private int scissorX, scissorY, scissorW, scissorH;
     private LuminRenderSystem.QuadRenderingInfo sharedInfo;
 
+    private static ShaderProgram rectangleShader = null;
+
     private RectRenderer() {
+    }
+
+    private static ShaderProgram getRectangleShader() {
+        if (rectangleShader == null) {
+            try {
+                ResourceManager resourceManager = Minecraft.getInstance().getResourceManager();
+                rectangleShader = ShaderProgram.load(
+                    ResourceLocation.fromNamespaceAndPath("openlumin", "shaders/rectangle.vsh"),
+                    ResourceLocation.fromNamespaceAndPath("openlumin", "shaders/rectangle.fsh"),
+                    resourceManager
+                );
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to load rectangle shader", e);
+            }
+        }
+        return rectangleShader;
     }
 
     public static RectRenderer create() {
@@ -113,24 +137,69 @@ public class RectRenderer implements IRenderer {
         if (info == null || info.colorView() == null) return;
         if (scissorEnabled && !ScissorUtils.isVisible(scissorW, scissorH)) return;
 
-        // NeoForge不支持RenderSystem.getDevice()和RenderPass API
-        // 使用传统OpenGL绘制代替
-        /*
-        try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
-                () -> "Rect Draw",
-                info.colorView(), OptionalInt.empty(),
-                info.depthView(), OptionalDouble.empty())
-        ) {
-            pass.setPipeline(LuminRenderPipelines.RECTANGLE);
-            if (scissorEnabled) {
-                ScissorUtils.enableScissor(pass, scissorX, scissorY, scissorW, scissorH);
-            }
+        // NeoForge实现：使用直接OpenGL调用替代RenderPass API
+        drawWithOpenGL(info);
+    }
 
-            RenderSystem.bindDefaultUniforms(pass);
-            pass.setUniform("DynamicTransforms", info.dynamicUniforms());
-            drawPrepared(pass, info);
+    private void drawWithOpenGL(LuminRenderSystem.QuadRenderingInfo info) {
+        ShaderProgram shader = getRectangleShader();
+        shader.use();
+
+        // 启用混合模式
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+
+        // 设置scissor test
+        if (scissorEnabled) {
+            GL11.glEnable(GL11.GL_SCISSOR_TEST);
+            GL11.glScissor(scissorX, scissorY, scissorW, scissorH);
+        } else {
+            GL11.glDisable(GL11.GL_SCISSOR_TEST);
         }
-        */
+
+        // 绑定UBO (DynamicTransforms)
+        if (info.dynamicUniforms() != null && info.dynamicUniforms().buffer() != null) {
+            GL31.glBindBufferRange(
+                GL31.GL_UNIFORM_BUFFER,
+                0, // binding point 0
+                info.dynamicUniforms().buffer().getBufferId(),
+                info.dynamicUniforms().offset(),
+                info.dynamicUniforms().size()
+            );
+        }
+
+        // 设置顶点属性
+        int vao = GL30.glGenVertexArrays();
+        GL30.glBindVertexArray(vao);
+
+        // 绑定vertex buffer
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer.getGpuBuffer().getBufferId());
+
+        // Position (vec3): location 0, offset 0
+        GL20.glEnableVertexAttribArray(0);
+        GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, STRIDE, 0);
+
+        // Color (vec4): location 1, offset 12
+        GL20.glEnableVertexAttribArray(1);
+        GL20.glVertexAttribPointer(1, 4, GL11.GL_UNSIGNED_BYTE, true, STRIDE, 12);
+
+        // 绑定index buffer
+        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, info.ibo().getBufferId());
+
+        // 执行绘制
+        int indexType = info.indexType() == com.mojang.blaze3d.vertex.VertexFormat.IndexType.INT
+            ? GL11.GL_UNSIGNED_INT : GL11.GL_UNSIGNED_SHORT;
+        GL11.glDrawElements(GL11.GL_TRIANGLES, info.indexCount(), indexType, 0);
+
+        // 清理
+        GL30.glBindVertexArray(0);
+        GL30.glDeleteVertexArrays(vao);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
+
+        if (scissorEnabled) {
+            GL11.glDisable(GL11.GL_SCISSOR_TEST);
+        }
     }
 
     @Override

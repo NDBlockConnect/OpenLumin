@@ -5,21 +5,17 @@ import io.github.openlumin.LuminRenderSystem;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.buffers.Std140SizeCalculator;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.pipeline.TextureTarget;
-import com.mojang.blaze3d.shaders.UniformType;
-import com.mojang.blaze3d.systems.CommandEncoder;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.platform.FilterMode;
 import net.minecraft.client.renderer.DynamicUniformStorage;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.ResourceLocation;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL31;
 
 import java.awt.*;
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.OptionalInt;
 
 import net.minecraft.client.Minecraft;
 
@@ -31,32 +27,66 @@ public class FilterShader {
             .putVec4()
             .get();
 
-    private RenderPipeline pipeline;
-    private RenderTarget input;
+    private ShaderProgram shaderProgram;
+    private int inputFBO;
+    private int inputTexture;
+    private int inputWidth;
+    private int inputHeight;
 
     private void ensureProgram() {
-        if (this.pipeline == null) {
-            this.pipeline = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
-                    .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin", "pipeline/filter"))
-                    .withVertexShader(ResourceLocation.withDefaultNamespace("core/screenquad"))
-                    .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin", "filter"))
-                    .withUniform("FilterColor", UniformType.UNIFORM_BUFFER)
-                    .withSampler("InputSampler")
-                    .withCull(false)
-                    .build();
+        if (this.shaderProgram == null) {
+            try {
+                // 加载 shader（使用 Minecraft 内置的 screenquad.vsh 和自定义的 filter.fsh）
+                ResourceLocation vertexShader = ResourceLocation.withDefaultNamespace("shaders/core/screenquad.vsh");
+                ResourceLocation fragmentShader = ResourceLocation.fromNamespaceAndPath("openlumin", "shaders/filter.fsh");
+
+                this.shaderProgram = ShaderProgram.load(
+                    vertexShader,
+                    fragmentShader,
+                    Minecraft.getInstance().getResourceManager()
+                );
+
+                // 绑定 uniform block 和采样器
+                shaderProgram.bindUniformBlock("FilterColor", 0);
+                shaderProgram.setSamplerUnit("InputSampler", 0);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to load filter shader", e);
+            }
         }
     }
 
-    private void ensureInput(RenderTarget framebuffer) {
+    private void ensureInputFBO(RenderTarget framebuffer) {
         int fbWidth = framebuffer.width;
         int fbHeight = framebuffer.height;
 
-        if (this.input == null) {
-            this.input = new TextureTarget(fbWidth, fbHeight, false);
-        }
+        if (inputFBO == 0 || inputWidth != fbWidth || inputHeight != fbHeight) {
+            // 清理旧资源
+            if (inputFBO != 0) {
+                GL30.glDeleteFramebuffers(inputFBO);
+                GL11.glDeleteTextures(inputTexture);
+            }
 
-        if (this.input.width != fbWidth || this.input.height != fbHeight) {
-            this.input.resize(fbWidth, fbHeight);
+            // 创建新的 FBO 和纹理
+            inputWidth = fbWidth;
+            inputHeight = fbHeight;
+
+            inputTexture = GL11.glGenTextures();
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, inputTexture);
+            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8, fbWidth, fbHeight, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL13.GL_CLAMP_TO_EDGE);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL13.GL_CLAMP_TO_EDGE);
+
+            inputFBO = GL30.glGenFramebuffers();
+            GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, inputFBO);
+            GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL11.GL_TEXTURE_2D, inputTexture, 0);
+
+            if (GL30.glCheckFramebufferStatus(GL30.GL_FRAMEBUFFER) != GL30.GL_FRAMEBUFFER_COMPLETE) {
+                throw new RuntimeException("Failed to create filter input FBO");
+            }
+
+            GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
         }
     }
 
@@ -71,46 +101,53 @@ public class FilterShader {
             return;
         }
 
-        if (framebuffer.getColorTexture() == null || framebuffer.getColorTextureView() == null) {
-            return;
-        }
+        this.ensureInputFBO(framebuffer);
 
-        this.ensureInput(framebuffer);
-
-        if (this.input.getColorTexture() == null || this.input.getColorTextureView() == null) {
-            return;
-        }
-
-        // NeoForge不支持RenderSystem.getDevice()和CommandEncoder API
-        /*
-        CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
-        encoder.copyTextureToTexture(
-                framebuffer.getColorTexture(),
-                this.input.getColorTexture(),
-                0, 0, 0, 0, 0,
-                framebuffer.width, framebuffer.height
+        // 1. 复制 framebuffer 内容到 inputFBO
+        GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, framebuffer.frameBufferId);
+        GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, inputFBO);
+        GL30.glBlitFramebuffer(
+            0, 0, framebuffer.width, framebuffer.height,
+            0, 0, framebuffer.width, framebuffer.height,
+            GL11.GL_COLOR_BUFFER_BIT, GL11.GL_NEAREST
         );
 
+        // 2. 准备 uniform 数据
         GpuBufferSlice filterColor = LuminRenderSystem.writeDynamicUniform(
-                "filter_color",
-                "Epsilon Filter UBO",
-                UNIFORMS_SIZE,
-                4,
-                new FilterColor(color)
+            "filter_color",
+            "Epsilon Filter UBO",
+            UNIFORMS_SIZE,
+            4,
+            new FilterColor(color)
         );
 
-        try (RenderPass renderPass = encoder.createRenderPass(
-                () -> "Epsilon Filter",
-                framebuffer.getColorTextureView(),
-                OptionalInt.empty()
-        )) {
-            renderPass.setPipeline(this.pipeline);
-            RenderSystem.bindDefaultUniforms(renderPass);
-            renderPass.setUniform("FilterColor", filterColor);
-            renderPass.bindTexture("InputSampler", this.input.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
-            renderPass.draw(0, 3);
-        }
-        */
+        // 3. 绑定到 framebuffer 进行渲染
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, framebuffer.frameBufferId);
+        GL11.glViewport(0, 0, framebuffer.width, framebuffer.height);
+
+        // 使用 shader
+        shaderProgram.use();
+
+        // 绑定 UBO
+        GL31.glBindBufferRange(
+            GL31.GL_UNIFORM_BUFFER,
+            0,
+            filterColor.buffer().getBufferId(),
+            filterColor.offset(),
+            filterColor.size()
+        );
+
+        // 绑定输入纹理
+        GL13.glActiveTexture(GL13.GL_TEXTURE0);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, inputTexture);
+
+        // 绘制全屏四边形
+        GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
+
+        // 清理状态
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        GL20.glUseProgram(0);
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
     }
 
     private record FilterColor(float red, float green, float blue,

@@ -38,3 +38,24 @@ desktop.ini
 # 用户特定配置
 .vscode/
 *.code-workspace
+
+# Agent/AI 工作区文件（不应提交）
+SOUL.md
+USER.md
+memory/
+.claude/
+
+# AI 生成的临时文档
+PROGRESS.md
+IMPLEMENTATION_STATUS.md
+NEOFORGE_IMPLEMENTATION_PLAN.md
+PROGRESS_SUMMARY.md
+*_SUMMARY.md
+*_STATUS.md
+*_PLAN.md
+
+# 临时脚本和分析文件
+analyze-dependencies.py
+build-phase1.sh
+generate-modules.py
+dependency-analysis.txt

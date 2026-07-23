@@ -5,21 +5,16 @@ import io.github.openlumin.LuminRenderSystem;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.buffers.Std140SizeCalculator;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.shaders.UniformType;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.platform.GpuTextureView;
 import net.minecraft.client.renderer.DynamicUniformStorage;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Util;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL31;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.OptionalDouble;
-import java.util.OptionalInt;
 
 import net.minecraft.client.Minecraft;
 
@@ -40,23 +35,37 @@ public class GlslSandBox implements AutoCloseable {
             .putVec4()
             .get();
 
-    private final Map<ResourceLocation, RenderPipeline> pipelines = new HashMap<>();
+    private final Map<ResourceLocation, ShaderProgram> pipelines = new HashMap<>();
 
-    private long initTime = System.currentTimeMillis(); // Util.getMillis();
+    private long initTime = System.currentTimeMillis();
 
-    private RenderPipeline getOrCreatePipeline(ResourceLocation fragmentShader) {
-        return pipelines.computeIfAbsent(fragmentShader, shader -> RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
-                .withLocation(ResourceLocation.fromNamespaceAndPath(shader.getNamespace(), "pipelines/glsl_sandbox/" + shader.getPath().replace('/', '_')))
-                .withVertexShader(ResourceLocation.withDefaultNamespace("core/screenquad"))
-                .withFragmentShader(shader)
-                .withUniform("GlslSandboxInfo", UniformType.UNIFORM_BUFFER)
-                .withCull(false)
-                .build()
-        );
+    private ShaderProgram getOrCreateShaderProgram(ResourceLocation fragmentShader) {
+        return pipelines.computeIfAbsent(fragmentShader, shader -> {
+            try {
+                // 使用 Minecraft 内置的 screenquad.vsh 和用户提供的片段着色器
+                ResourceLocation vertexShader = ResourceLocation.withDefaultNamespace("shaders/core/screenquad.vsh");
+                ResourceLocation fragmentPath = ResourceLocation.fromNamespaceAndPath(
+                    shader.getNamespace(),
+                    "shaders/" + shader.getPath() + ".fsh"
+                );
+
+                ShaderProgram program = ShaderProgram.load(
+                    vertexShader,
+                    fragmentPath,
+                    Minecraft.getInstance().getResourceManager()
+                );
+
+                // 绑定 uniform block
+                program.bindUniformBlock("GlslSandboxInfo", 0);
+                return program;
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to load GLSL sandbox shader: " + shader, e);
+            }
+        });
     }
 
     public void resetTime() {
-        initTime = System.currentTimeMillis(); // Util.getMillis();
+        initTime = System.currentTimeMillis();
     }
 
     public void render(ResourceLocation fragmentShader, double mouseX, double mouseY) {
@@ -64,12 +73,10 @@ public class GlslSandBox implements AutoCloseable {
     }
 
     public void render(ResourceLocation fragmentShader, double mouseX, double mouseY, long startTimeMs) {
-        GpuTextureView colorView = LuminRenderSystem.resolveColorView();
-        if (colorView == null) return;
-
         final var activeTarget = LuminRenderSystem.getActiveTarget();
         final int targetWidth = activeTarget != null ? activeTarget.width() : Minecraft.getInstance().getMainRenderTarget().width;
         final int targetHeight = activeTarget != null ? activeTarget.height() : Minecraft.getInstance().getMainRenderTarget().height;
+        final int targetFBO = activeTarget == null ? Minecraft.getInstance().getMainRenderTarget().frameBufferId : 0;
 
         if (targetWidth <= 0 || targetHeight <= 0) return;
 
@@ -80,7 +87,8 @@ public class GlslSandBox implements AutoCloseable {
         float mousePxY = (float) mouseY * scaleY;
         float mouseUvX = mousePxX / targetWidth;
         float mouseUvY = (targetHeight - 1.0f - mousePxY) / targetHeight;
-        float elapsedTime = (System.currentTimeMillis() - startTimeMs) / 1000.0f; // Util.getMillis()
+        float elapsedTime = (System.currentTimeMillis() - startTimeMs) / 1000.0f;
+
         GpuBufferSlice sandboxInfo = LuminRenderSystem.writeDynamicUniform(
                 "glsl_sandbox_info",
                 "Lumin GLSL Sandbox UBO",
@@ -89,24 +97,34 @@ public class GlslSandBox implements AutoCloseable {
                 new SandboxInfo(targetWidth, targetHeight, elapsedTime, mouseUvX, mouseUvY, mousePxX, mousePxY)
         );
 
-        // NeoForge不支持RenderSystem.getDevice()和CommandEncoder API
-        /*
-        final var encoder = RenderSystem.getDevice().createCommandEncoder();
-        try (RenderPass pass = encoder.createRenderPass(
-                () -> "Lumin GLSL Sandbox",
-                colorView, OptionalInt.empty(),
-                LuminRenderSystem.resolveDepthView(), OptionalDouble.empty())
-        ) {
-            pass.setPipeline(getOrCreatePipeline(fragmentShader));
-            RenderSystem.bindDefaultUniforms(pass);
-            pass.setUniform("GlslSandboxInfo", sandboxInfo);
-            pass.draw(0, 3);
-        }
-        */
+        // 绑定到 framebuffer 进行渲染
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, targetFBO);
+        GL11.glViewport(0, 0, targetWidth, targetHeight);
+
+        // 使用 shader
+        ShaderProgram program = getOrCreateShaderProgram(fragmentShader);
+        program.use();
+
+        // 绑定 UBO
+        GL31.glBindBufferRange(
+            GL31.GL_UNIFORM_BUFFER,
+            0,
+            sandboxInfo.buffer().getBufferId(),
+            sandboxInfo.offset(),
+            sandboxInfo.size()
+        );
+
+        // 绘制全屏四边形
+        GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
+
+        // 清理状态
+        GL20.glUseProgram(0);
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
     }
 
     @Override
     public void close() {
+        pipelines.values().forEach(ShaderProgram::close);
         pipelines.clear();
     }
 

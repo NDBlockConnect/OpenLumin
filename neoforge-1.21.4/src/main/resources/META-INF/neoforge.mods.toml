@@ -1,4 +1,4 @@
-modLoader = "neoforge"
+modLoader = "javafml"
 loaderVersion = "[4,)"
 license = "GPL-3.0-only"
 
@@ -12,7 +12,7 @@ authors = "NDBlockConnect Team"
 [[dependencies.openlumin]]
     modId = "neoforge"
     type = "required"
-    versionRange = "[21.4.27,)"
+    versionRange = "[21.4,)"
     ordering = "NONE"
     side = "BOTH"
 

@@ -2,6 +2,7 @@ package io.github.openlumin.immediate;
 
 import io.github.openlumin.LuminRenderSystem;
 import io.github.openlumin.buffer.LuminRingBuffer;
+import io.github.openlumin.shaders.ShaderProgram;
 import com.mojang.blaze3d.platform.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
@@ -20,6 +21,7 @@ import net.minecraft.util.Mth;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+import org.lwjgl.opengl.*;
 import org.lwjgl.system.MemoryUtil;
 
 import javax.annotation.Nullable;
@@ -336,53 +338,9 @@ public final class LuminImmediateRenderer {
                     return;
                 }
 
-                // NeoForge不支持RenderSystem.getDynamicUniforms()
-                /*
-                GpuBufferSlice dynamicUniforms = RenderSystem.getDynamicUniforms().writeTransform(
-                        RenderSystem.getModelViewMatrix(),
-                        new Vector4f(1, 1, 1, 1),
-                        new Vector3f(0, 0, 0),
-                        TextureTransform.DEFAULT_TEXTURING.getMatrix()
-                );
-                */
-                GpuBufferSlice dynamicUniforms = new GpuBufferSlice(new GpuBuffer(256, GpuBuffer.USAGE_UNIFORM), 0, 256);
+                // NeoForge实现：使用直接OpenGL调用
+                submittedDraw = drawWithOpenGL();
 
-                // NeoForge不支持RenderSystem.getDevice()和完整的RenderPass API
-                // 使用传统OpenGL绘制代替
-                /*
-                try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
-                        () -> "Lumin Immediate Draw",
-                        colorView, OptionalInt.empty(),
-                        depthView, OptionalDouble.empty())
-                ) {
-                    pass.setPipeline(this.pipeline);
-                    RenderSystem.bindDefaultUniforms(pass);
-                    pass.setUniform("DynamicTransforms", dynamicUniforms);
-                    pass.setVertexBuffer(0, this.ringBuffer.getGpuBuffer());
-
-                    if (this.texture != null) {
-                        AbstractTexture textureObject = Minecraft.getInstance().getTextureManager().getTexture(this.texture);
-                        pass.bindTexture("Sampler0", textureObject.getTextureView(), textureObject.getSampler());
-                    }
-
-                    switch (this.mode) {
-                        case LINES, QUADS -> {
-                            int indexCount = this.mode.indexCount(this.vertexCount);
-                            if (indexCount > 0) {
-                                RenderSystem.AutoStorageIndexBuffer autoIndices = RenderSystem.getSequentialBuffer(this.mode);
-                                GpuBuffer ibo = autoIndices.getBuffer(indexCount);
-                                pass.setIndexBuffer(ibo, autoIndices.type());
-                                pass.drawIndexed(Math.toIntExact(this.batchStartOffset / this.stride), 0, indexCount, 1);
-                                submittedDraw = true;
-                            }
-                        }
-                        default -> {
-                            pass.draw(Math.toIntExact(this.batchStartOffset / this.stride), this.vertexCount);
-                            submittedDraw = true;
-                        }
-                    }
-                }
-                */
             } finally {
                 if (this.ringBuffer.isMapped()) {
                     this.ringBuffer.unmap();
@@ -401,6 +359,88 @@ public final class LuminImmediateRenderer {
                 this.pipeline = null;
                 this.texture = null;
             }
+        }
+
+        private boolean drawWithOpenGL() {
+            // 启用混合模式
+            GL11.glEnable(GL11.GL_BLEND);
+            GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+
+            // 创建并配置VAO
+            int vao = GL30.glGenVertexArrays();
+            GL30.glBindVertexArray(vao);
+
+            // 绑定vertex buffer
+            GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.ringBuffer.getGpuBuffer().getBufferId());
+
+            // 配置顶点属性（基于format）
+            if (this.positionOffset >= 0) {
+                GL20.glEnableVertexAttribArray(0);
+                GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, this.stride, this.positionOffset);
+            }
+
+            if (this.uvOffset >= 0) {
+                GL20.glEnableVertexAttribArray(1);
+                GL20.glVertexAttribPointer(1, 2, GL11.GL_FLOAT, false, this.stride, this.uvOffset);
+            }
+
+            if (this.colorOffset >= 0) {
+                int colorLocation = (this.uvOffset >= 0) ? 2 : 1;
+                GL20.glEnableVertexAttribArray(colorLocation);
+                GL20.glVertexAttribPointer(colorLocation, 4, GL11.GL_UNSIGNED_BYTE, true, this.stride, this.colorOffset);
+            }
+
+            // 绑定纹理（如果有）
+            if (this.texture != null) {
+                AbstractTexture textureObject = Minecraft.getInstance().getTextureManager().getTexture(this.texture);
+                GL13.glActiveTexture(GL13.GL_TEXTURE0);
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureObject.getId());
+            }
+
+            // 执行绘制
+            boolean drawn = false;
+            int firstVertex = Math.toIntExact(this.batchStartOffset / this.stride);
+
+            switch (this.mode) {
+                case LINES -> {
+                    GL11.glDrawArrays(GL11.GL_LINES, firstVertex, this.vertexCount);
+                    drawn = true;
+                }
+                case QUADS -> {
+                    // QUADS需要使用index buffer
+                    int indexCount = this.mode.indexCount(this.vertexCount);
+                    if (indexCount > 0) {
+                        RenderSystem.AutoStorageIndexBuffer autoIndices = RenderSystem.getSequentialBuffer(this.mode);
+                        com.mojang.blaze3d.platform.GpuBuffer ibo = LuminRenderSystem.getQuadIndexBuffer(indexCount);
+                        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, ibo.getBufferId());
+
+                        int indexType = autoIndices.type() == VertexFormat.IndexType.INT
+                            ? GL11.GL_UNSIGNED_INT : GL11.GL_UNSIGNED_SHORT;
+                        GL11.glDrawElements(GL11.GL_TRIANGLES, indexCount, indexType, 0);
+                        drawn = true;
+                    }
+                }
+                case TRIANGLE_STRIP -> {
+                    GL11.glDrawArrays(GL11.GL_TRIANGLE_STRIP, firstVertex, this.vertexCount);
+                    drawn = true;
+                }
+                case TRIANGLE_FAN -> {
+                    GL11.glDrawArrays(GL11.GL_TRIANGLE_FAN, firstVertex, this.vertexCount);
+                    drawn = true;
+                }
+                default -> {
+                    GL11.glDrawArrays(GL11.GL_TRIANGLES, firstVertex, this.vertexCount);
+                    drawn = true;
+                }
+            }
+
+            // 清理
+            GL30.glBindVertexArray(0);
+            GL30.glDeleteVertexArrays(vao);
+            GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+            GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
+
+            return drawn;
         }
 
         private void endFrame() {
