@@ -1,10 +1,13 @@
 package io.github.openlumin.schedulers.render3d;
 
 import net.minecraft.resources.ResourceLocation;
+import io.github.openlumin.LuminRenderPipelines;
+import io.github.openlumin.LuminVertexFormats;
 import io.github.openlumin.immediate.LuminImmediateRenderer;
 import io.github.openlumin.shaders.BlurShader;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.Direction;
@@ -30,13 +33,13 @@ public final class Render3DScheduler {
 
     public static final Render3DScheduler INSTANCE = new Render3DScheduler();
 
-    private static final RenderPipeline FILLED_BOX_PIPELINE = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin","pipeline/filled_box"))
-            .withCull(false)
-            .build();
+    private static final RenderPipeline FILLED_BOX_PIPELINE = LuminRenderPipelines.RECTANGLE;
 
-    private static final RenderPipeline LINES_PIPELINE = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin","pipeline/lines"))
+    private static final RenderPipeline LINES_PIPELINE = RenderPipeline.builder(LuminRenderPipelines.BASE_SNIPPET)
+            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/lines"))
+            .withVertexFormat(LuminVertexFormats.POSITION_COLOR_NORMAL_LINE_WIDTH, VertexFormat.Mode.LINES)
+            .withVertexShader(ResourceLocation.fromNamespaceAndPath("openlumin", "lines"))
+            .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin", "lines"))
             .withCull(false)
             .build();
 

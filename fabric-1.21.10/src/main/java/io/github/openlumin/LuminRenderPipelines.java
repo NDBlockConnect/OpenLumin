@@ -25,7 +25,8 @@ public class LuminRenderPipelines {
      *   - RECTANGLE：支持半透明颜色
      *   - ROUND_RECT 等：SDF 抗锯齿依赖 smoothstep alpha 与背景混合
      */
-    private final static RenderPipeline.Snippet BASE_SNIPPET = RenderPipeline.builder()
+    /** 对外公开，供 Render3DScheduler 等其他 pipeline 复用 */
+    public final static RenderPipeline.Snippet BASE_SNIPPET = RenderPipeline.builder()
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withUniform("Projection", UniformType.UNIFORM_BUFFER)
             .withBlend(BlendFunction.TRANSLUCENT)
