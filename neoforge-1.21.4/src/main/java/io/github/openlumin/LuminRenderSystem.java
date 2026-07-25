@@ -3,50 +3,101 @@ package io.github.openlumin;
 import io.github.openlumin.text.StaticFontLoader;
 import io.github.openlumin.holders.RenderTargetHolder;
 import io.github.openlumin.holders.RendererHolder;
+import io.github.openlumin.shaders.ShaderProgram;
 import io.github.openlumin.utils.render.ScissorUtils;
 import com.mojang.blaze3d.ProjectionType;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import io.github.openlumin.shim.com.mojang.blaze3d.buffers.GpuBuffer;
+import io.github.openlumin.shim.com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.platform.*;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuTexture;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuTextureView;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuSampler;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.TextureFormat;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.FilterMode;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.AddressMode;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuDevice;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.CommandEncoder;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.CompareOp;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.renderer.DynamicUniformStorage;
-import net.minecraft.client.renderer.Projection;
-import net.minecraft.client.renderer.ProjectionMatrixBuffer;
-import net.minecraft.client.renderer.rendertype.TextureTransform;
-import net.minecraft.client.renderer.state.WindowRenderState;
+import io.github.openlumin.shim.net.minecraft.client.input.MouseButtonEvent;
+import io.github.openlumin.impl.DynamicUniformStorage;
+import io.github.openlumin.shim.net.minecraft.client.renderer.state.WindowRenderState;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.ResourceManager;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.joml.*;
 
 import javax.annotation.Nullable;
+import java.io.IOException;
 import java.lang.Math;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.OptionalDouble;
+import java.util.concurrent.ConcurrentHashMap;
 
 import net.minecraft.client.Minecraft;
 
 public class LuminRenderSystem {
 
-    public static final Projection guiOrthoProjection = new Projection();
-
-    private static final ProjectionMatrixBuffer guiProjectionMatrixBuffer = new ProjectionMatrixBuffer("lumin-gui");
+    private static final Logger LOGGER = LogManager.getLogger("OpenLumin");
 
     @Nullable
     private static LuminRenderTarget activeTarget = null;
     private static long renderFrameId;
+
+    // ── Shader cache ───────────────────────────────────────────────────────
+    private static final Map<ResourceLocation, ShaderProgram> SHADER_CACHE = new ConcurrentHashMap<>();
+
+    /**
+     * 根据 LuminPipeline 获取或编译着色器程序（按 location 缓存）
+     */
+    public static ShaderProgram getOrCompileShader(LuminPipeline pipeline) {
+        if (pipeline == null) return null;
+        ResourceLocation vsRL = pipeline.getVertexShader();
+        ResourceLocation fsRL = pipeline.getFragmentShader();
+        if (vsRL == null || fsRL == null) return null;
+
+        return SHADER_CACHE.computeIfAbsent(pipeline.getLocation(), loc -> {
+            try {
+                ResourceManager rm = Minecraft.getInstance().getResourceManager();
+                // 构造完整 shader 路径：openlumin:rectangle → assets/openlumin/shaders/rectangle.vsh
+                ResourceLocation vsPath = ResourceLocation.fromNamespaceAndPath(
+                    vsRL.getNamespace(), "shaders/" + vsRL.getPath() + ".vsh");
+                ResourceLocation fsPath = ResourceLocation.fromNamespaceAndPath(
+                    fsRL.getNamespace(), "shaders/" + fsRL.getPath() + ".fsh");
+                LOGGER.info("[OpenLumin] Compiling shader: {} / {}", vsPath, fsPath);
+                ShaderProgram prog = ShaderProgram.load(vsPath, fsPath, rm);
+                LOGGER.info("[OpenLumin] Shader compiled OK: {}", loc);
+                return prog;
+            } catch (IOException e) {
+                LOGGER.error("[OpenLumin] Failed to compile shader {}: {}", loc, e.getMessage(), e);
+                return null;
+            }
+        });
+    }
+
+    public static void clearShaderCache() {
+        SHADER_CACHE.values().forEach(p -> { if (p != null) p.close(); });
+        SHADER_CACHE.clear();
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     public static void setActiveTarget(@Nullable LuminRenderTarget target) {
         activeTarget = target;
     }
 
     public static void destroyAll() {
-        guiProjectionMatrixBuffer.close();
         ShaderUniforms.closeAll();
         RenderTargetHolder.INSTANCE.destroyAll();
         RendererHolder.INSTANCE.destroyAll();
         StaticFontLoader.destroyDefault();
+        if (quadIndexBuffer != null) {
+            quadIndexBuffer.close();
+            quadIndexBuffer = null;
+            quadIndexBufferCapacity = 0;
+        }
+        clearShaderCache();
     }
 
     public static <T extends DynamicUniformStorage.DynamicUniform> GpuBufferSlice writeDynamicUniform(
@@ -141,15 +192,11 @@ public class LuminRenderSystem {
     }
 
     public static void applyOrthoProjection() {
-        guiOrthoProjection
-                .setupOrtho(-1000.0F, 1000.0F,
-                        getScaledWidth(),
-                        getScaledHeight(),
-                        true
-                );
-        // NeoForge的setProjectionMatrix签名不同，需要Matrix4f而非GpuBufferSlice
-        // RenderSystem.setProjectionMatrix(
-        //         guiProjectionMatrixBuffer.getBuffer(guiOrthoProjection), ProjectionType.ORTHOGRAPHIC);
+        float w = getScaledWidth();
+        float h = getScaledHeight();
+        // Build orthographic matrix: (0,0) top-left, (w,h) bottom-right, z in [-1000, 1000]
+        org.joml.Matrix4f proj = new org.joml.Matrix4f().setOrtho(0f, w, h, 0f, -1000f, 1000f);
+        RenderSystem.setProjectionMatrix(proj, com.mojang.blaze3d.ProjectionType.ORTHOGRAPHIC);
     }
 
     /**
@@ -158,13 +205,16 @@ public class LuminRenderSystem {
      */
     public static GpuTextureView resolveColorView() {
         if (activeTarget != null) return activeTarget.colorView();
-        return Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
+        // NeoForge 1.21.4: getColorTextureView() 在 MC 1.21.4 运行时不存在。
+        // OpenGL 直接绘制路径不需要此视图；返回 dummy 非 null 值让调用方不跳过绘制。
+        return new GpuTextureView(); // dummy sentinel：OpenGL路径不使用此视图
     }
 
     @Nullable
     public static GpuTextureView resolveDepthView() {
         if (activeTarget != null) return activeTarget.depthView();
-        return Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
+        // NeoForge 1.21.4: depth view 不需要，返回 null 即可（调用方允许 null）
+        return null;
     }
 
     public static QuadRenderingInfo prepareQuadRendering(int vertexCount) {
@@ -181,24 +231,57 @@ public class LuminRenderSystem {
         if (colorView == null) return null;
 
         final var indexCount = vertexCount / 4 * 6;
-        com.mojang.blaze3d.platform.GpuBuffer ibo = getQuadIndexBuffer(indexCount);
+        io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuBuffer ibo = getQuadIndexBuffer(indexCount);
 
         GpuBufferSlice dynamicUniforms = writeTransform(
                 RenderSystem.getModelViewMatrix(),
                 new Vector4f(1, 1, 1, 1),
                 new Vector3f(0, 0, 0),
-                TextureTransform.DEFAULT_TEXTURING.getMatrix()
+                new org.joml.Matrix4f()
         );
 
         return new QuadRenderingInfo(colorView, depthView, getQuadIndexType(), ibo, indexCount, dynamicUniforms);
     }
 
-    public static com.mojang.blaze3d.platform.GpuBuffer getQuadIndexBuffer(int indexCount) {
-        RenderSystem.AutoStorageIndexBuffer autoIndices =
-                RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
-        // NeoForge的AutoStorageIndexBuffer没有getBuffer方法
-        // return autoIndices.getBuffer(indexCount);
-        return new com.mojang.blaze3d.platform.GpuBuffer(indexCount * 4, com.mojang.blaze3d.platform.GpuBuffer.USAGE_INDEX);
+    private static io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuBuffer quadIndexBuffer;
+    private static int quadIndexBufferCapacity = 0;
+
+    public static io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuBuffer getQuadIndexBuffer(int indexCount) {
+        // Ensure buffer has enough capacity
+        if (indexCount > quadIndexBufferCapacity) {
+            if (quadIndexBuffer != null) quadIndexBuffer.close();
+
+            int newCapacity = Math.max(indexCount, quadIndexBufferCapacity * 2);
+            newCapacity = Math.max(newCapacity, 6); // at least 1 quad
+            newCapacity = (newCapacity + 5) / 6 * 6; // round up to multiple of 6
+
+            quadIndexBuffer = new io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuBuffer(
+                newCapacity * 2, io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuBuffer.USAGE_INDEX);
+
+            // Generate quad indices: 0,1,2,0,2,3, 4,5,6,4,6,7, ...
+            java.nio.ByteBuffer data = org.lwjgl.BufferUtils.createByteBuffer(newCapacity * 2);
+            int quadCount = newCapacity / 6;
+            for (int q = 0; q < quadCount; q++) {
+                int base = q * 4;
+                data.putShort((short) base);
+                data.putShort((short)(base + 1));
+                data.putShort((short)(base + 2));
+                data.putShort((short) base);
+                data.putShort((short)(base + 2));
+                data.putShort((short)(base + 3));
+            }
+            data.flip();
+
+            // Upload to GPU
+            org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER,
+                                                quadIndexBuffer.getBufferId());
+            org.lwjgl.opengl.GL15.glBufferData(org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER,
+                                                data, org.lwjgl.opengl.GL15.GL_STATIC_DRAW);
+            org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
+
+            quadIndexBufferCapacity = newCapacity;
+        }
+        return quadIndexBuffer;
     }
 
     public static VertexFormat.IndexType getQuadIndexType() {
@@ -220,7 +303,7 @@ public class LuminRenderSystem {
                 RenderSystem.getModelViewMatrix(),
                 new Vector4f(1, 1, 1, 1),
                 new Vector3f(0, 0, 0),
-                TextureTransform.DEFAULT_TEXTURING.getMatrix()
+                new org.joml.Matrix4f()
         );
     }
 
@@ -231,7 +314,7 @@ public class LuminRenderSystem {
             GpuTextureView colorView,
             @Nullable GpuTextureView depthView,
             VertexFormat.IndexType indexType,
-            com.mojang.blaze3d.platform.GpuBuffer ibo,
+            io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuBuffer ibo,
             int indexCount,
             GpuBufferSlice dynamicUniforms
     ) {

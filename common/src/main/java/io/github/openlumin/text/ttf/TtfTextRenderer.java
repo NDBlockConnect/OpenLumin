@@ -12,7 +12,9 @@ import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import com.mojang.blaze3d.platform.GpuTextureView;
+import io.github.openlumin.text.minecraft.ClientSetting;
 import net.minecraft.util.ARGB;
 import org.lwjgl.system.MemoryUtil;
 
@@ -200,8 +202,8 @@ public class TtfTextRenderer implements ITextRenderer {
             float[] data = run.data;
             for (int i = 0; i < run.glyphCount; i++) {
                 int base = i * LAYOUT_FLOATS_PER_GLYPH;
-                int leftArgb = ARGB.toABGR(ARGB.srgbLerp(clamp01(data[base + 8] / totalWidth), startArgb, endArgb));
-                int rightArgb = ARGB.toABGR(ARGB.srgbLerp(clamp01(data[base + 9] / totalWidth), startArgb, endArgb));
+                int leftArgb = ARGB.toABGR(srgbLerp(clamp01(data[base + 8] / totalWidth), startArgb, endArgb));
+                int rightArgb = ARGB.toABGR(srgbLerp(clamp01(data[base + 9] / totalWidth), startArgb, endArgb));
                 writeGlyph(p, x, y, scale, data, base, leftArgb, rightArgb);
                 p += GLYPH_BYTES;
             }
@@ -282,6 +284,13 @@ public class TtfTextRenderer implements ITextRenderer {
         return width;
     }
 
+    private static int srgbLerp(float t, int start, int end) {
+        int sa = (start >> 24) & 0xFF, sr = (start >> 16) & 0xFF, sg = (start >> 8) & 0xFF, sb = start & 0xFF;
+        int ea = (end >> 24) & 0xFF, er = (end >> 16) & 0xFF, eg = (end >> 8) & 0xFF, eb = end & 0xFF;
+        return ((int)(sa + (ea - sa) * t) << 24) | ((int)(sr + (er - sr) * t) << 16)
+                | ((int)(sg + (eg - sg) * t) << 8) | (int)(sb + (eb - sb) * t);
+    }
+
     private static float clamp01(float value) {
         return Math.clamp(value, 0.0f, 1.0f);
     }
@@ -302,7 +311,7 @@ public class TtfTextRenderer implements ITextRenderer {
 
         GpuBufferSlice dynamicUniforms = LuminRenderSystem.writeDefaultGuiTransform();
         GpuBuffer ibo = LuminRenderSystem.getQuadIndexBuffer(maxIndexCount);
-        try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
+        try (RenderPass pass = RenderSystemExtensions.getDevice().createCommandEncoder().createRenderPass(
                 () -> "Lumin TTF Draws",
                 colorView, OptionalInt.empty(),
                 depthView, OptionalDouble.empty())
@@ -314,7 +323,7 @@ public class TtfTextRenderer implements ITextRenderer {
                 ScissorUtils.enableScissor(pass, scissorX, scissorY, scissorW, scissorH);
             }
 
-            RenderSystem.bindDefaultUniforms(pass);
+            // TODO: RenderSystem.bindDefaultUniforms not available in NeoForge 1.21.4
             pass.setUniform("DynamicTransforms", dynamicUniforms);
             pass.setIndexBuffer(ibo, LuminRenderSystem.getQuadIndexType());
 

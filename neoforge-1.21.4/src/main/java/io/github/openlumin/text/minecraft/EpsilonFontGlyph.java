@@ -6,18 +6,18 @@ import io.github.openlumin.text.ttf.TtfFontLoader;
 import io.github.openlumin.text.ttf.TtfGlyphAtlas;
 
 import com.mojang.blaze3d.font.GlyphInfo;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.GpuSampler;
-import com.mojang.blaze3d.platform.GpuTextureView;
+import io.github.openlumin.LuminPipeline;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuSampler;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.font.TextRenderable;
-import net.minecraft.client.gui.font.glyphs.BakedGlyph;
-import net.minecraft.client.renderer.rendertype.RenderSetup;
-import net.minecraft.client.renderer.rendertype.RenderType;
+import io.github.openlumin.shim.net.minecraft.client.gui.font.TextRenderable;
+import io.github.openlumin.shim.net.minecraft.client.gui.font.glyphs.BakedGlyph;
+import io.github.openlumin.shim.net.minecraft.client.renderer.rendertype.RenderSetup;
+import io.github.openlumin.shim.net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.network.chat.Style;
 import org.joml.Matrix4fc;
-import org.jspecify.annotations.Nullable;
+import io.github.openlumin.shim.org.jspecify.annotations.Nullable;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
@@ -84,11 +84,11 @@ public final class EpsilonFontGlyph implements BakedGlyph {
         }
         // NeoForge: ClientSetting.INSTANCE不存在，使用默认值
         Map<TtfGlyphAtlas, RenderType> renderTypes = AA_RENDER_TYPES; // ClientSetting.INSTANCE.fontAntiAliasing.getValue() ? AA_RENDER_TYPES : NO_AA_RENDER_TYPES;
-        RenderPipeline pipeline = LuminRenderPipelines.TTF_FONT_AA; // ClientSetting.INSTANCE.fontAntiAliasing.getValue() ? LuminRenderPipelines.TTF_FONT_AA : LuminRenderPipelines.TTF_FONT_NO_AA;
+        LuminPipeline pipeline = LuminRenderPipelines.TTF_FONT_AA;
         String name = "epsilon_ttf_text_aa"; // ClientSetting.INSTANCE.fontAntiAliasing.getValue() ? "epsilon_ttf_text_aa" : "epsilon_ttf_text_no_aa";
         return renderTypes.computeIfAbsent(this.descriptor.atlas(), atlas -> RenderType.create(
                 name,
-                RenderSetup.builder(pipeline)
+                RenderSetup.builder(null) // NeoForge 1.21.4 stub: LuminPipeline 不兼容旧 RenderPipeline 类型，传 null 即可（RenderSetup 为 no-op stub）
                         .withTexture("Sampler0", atlas.getTextureId(), () -> atlas.getTexture().getSampler())
                         .bufferSize(256) // RenderType.SMALL_BUFFER_SIZE
                         .createRenderSetup()
@@ -233,7 +233,7 @@ public final class EpsilonFontGlyph implements BakedGlyph {
         }
 
         // @Override - NeoForge的EpsilonTextRenderable接口不包含此方法
-        public RenderPipeline guiPipeline() {
+        public LuminPipeline guiPipeline() {
             // NeoForge: ClientSetting.INSTANCE不存在，使用默认值
             return LuminRenderPipelines.TTF_FONT_AA; // ClientSetting.INSTANCE.fontAntiAliasing.getValue() ? LuminRenderPipelines.TTF_FONT_AA : LuminRenderPipelines.TTF_FONT_NO_AA;
         }
@@ -281,8 +281,9 @@ public final class EpsilonFontGlyph implements BakedGlyph {
         }
 
         @Override
-        public BakedGlyph bake(java.util.function.Function<com.mojang.blaze3d.font.SheetGlyphInfo, BakedGlyph> function) {
-            // NeoForge需要实现bake方法
+        public net.minecraft.client.gui.font.glyphs.BakedGlyph bake(java.util.function.Function<com.mojang.blaze3d.font.SheetGlyphInfo, net.minecraft.client.gui.font.glyphs.BakedGlyph> function) {
+            // NeoForge需要实现bake方法（MC真身路径）；EpsilonFontGlyph 是 shim 的 BakedGlyph，
+            // 走独立渲染路径，不参与 MC 的 BakedGlyph 缓存，此处直接返回 null
             return null;
         }
     }

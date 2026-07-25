@@ -1,8 +1,8 @@
 package io.github.openlumin.buffer;
 
 import io.github.openlumin.LuminRenderSystem;
-import com.mojang.blaze3d.platform.GpuBuffer;
-import com.mojang.blaze3d.systems.CommandEncoder;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuBuffer;
+import io.github.openlumin.shim.com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderSystem;
 import org.lwjgl.system.MemoryUtil;
 
@@ -101,8 +101,7 @@ public class LuminRingBuffer {
     public void tryMap() {
         if (mapped) return;
         beginFrameIfNeeded();
-        // NeoForge不支持RenderSystem.getDevice()
-        // mappedBuffer = RenderSystem.getDevice().createCommandEncoder().mapBuffer(getGpuBuffer(), false, true);
+        mappedBuffer = buffers[current].map(0, sizes[current]);
         mapped = true;
     }
 

@@ -7,7 +7,7 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.StringDecomposer;
-import org.jspecify.annotations.Nullable;
+import io.github.openlumin.shim.org.jspecify.annotations.Nullable;
 
 public final class EpsilonFontMetrics {
 

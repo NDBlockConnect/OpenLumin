@@ -1,12 +1,13 @@
 package io.github.openlumin.schedulers.render3d;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import io.github.openlumin.immediate.LuminImmediateRenderer;
 import io.github.openlumin.shaders.BlurShader;
 import com.mojang.blaze3d.pipeline.DepthStencilState;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.CompareOp;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
@@ -26,13 +27,13 @@ public final class Render3DScheduler {
     public static final Render3DScheduler INSTANCE = new Render3DScheduler();
 
     private static final RenderPipeline FILLED_BOX_PIPELINE = RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
-            .withLocation(Identifier.of("openlumin", "pipeline/filled_box"))
+            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin","pipeline/filled_box"))
             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
             .build();
 
     private static final RenderPipeline LINES_PIPELINE = RenderPipeline.builder(RenderPipelines.LINES_SNIPPET)
-            .withLocation(Identifier.of("openlumin", "pipeline/lines"))
+            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin","pipeline/lines"))
             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
             .build();
@@ -48,21 +49,6 @@ public final class Render3DScheduler {
     }
 
     public static void init() {
-    }
-
-    public void flush(PoseStack poseStack) {
-        if (isEmpty()) {
-            return;
-        }
-
-        try {
-            flushBlur();
-            flushFilled();
-            flushOutline();
-            flushLines();
-        } finally {
-            clear();
-        }
     }
 
     public boolean isEmpty() {
@@ -174,8 +160,8 @@ public final class Render3DScheduler {
         }
 
         LuminImmediateRenderer.PosColorQuads builder = LuminImmediateRenderer.beginPosColorQuads(FILLED_BOX_PIPELINE);
-        Matrix4f matrix = Minecraft.getInstance().gameRenderer.getGameRenderState().levelRenderState.cameraRenderState.viewRotationMatrix;
-        Vec3 camPos = Minecraft.getInstance().getEntityRenderDispatcher().camera.position();
+        Matrix4f matrix = RenderSystem.getModelViewMatrix();
+        Vec3 camPos = Minecraft.getInstance().getEntityRenderDispatcher().camera.getPosition();
 
         for (FilledBoxCommand command : filledBoxes) {
             emitFilledBox(builder, matrix, camPos, command);
@@ -194,7 +180,7 @@ public final class Render3DScheduler {
         }
 
         LuminImmediateRenderer.Lines builder = LuminImmediateRenderer.beginLines(LINES_PIPELINE);
-        Vec3 camPos = Minecraft.getInstance().getEntityRenderDispatcher().camera.position();
+        Vec3 camPos = Minecraft.getInstance().getEntityRenderDispatcher().camera.getPosition();
         PoseStack.Pose pose = stack.last();
         Matrix4f matrix = pose.pose();
 

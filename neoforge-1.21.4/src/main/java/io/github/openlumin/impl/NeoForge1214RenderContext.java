@@ -2,7 +2,7 @@ package io.github.openlumin.impl;
 
 import io.github.openlumin.api.RenderContext;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.state.WindowRenderState;
+import io.github.openlumin.shim.net.minecraft.client.renderer.state.WindowRenderState;
 import com.mojang.blaze3d.systems.RenderSystem;
 import org.joml.Matrix4f;
 
@@ -70,11 +70,9 @@ public class NeoForge1214RenderContext implements RenderContext {
 
     @Override
     public void rotate(float angle, float x, float y, float z) {
-        // NeoForge不支持RenderSystem.getModelViewStack()
-        // RenderSystem.getModelViewStack().mulPose(
-        //     new org.joml.Quaternionf().rotateAxis(
-        //         (float) Math.toRadians(angle), x, y, z
-        //     )
-        // );
+        // Matrix4fStack（JOML）的 rotate() 接受弧度，参数约定与 GL 相同（轴角）
+        RenderSystem.getModelViewStack().rotate(
+                (float) Math.toRadians(angle), x, y, z
+        );
     }
 }

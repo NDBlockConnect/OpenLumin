@@ -9,7 +9,8 @@ import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import com.mojang.blaze3d.platform.GpuTextureView;
 import net.minecraft.client.renderer.rendertype.TextureTransform;
 import net.minecraft.util.ARGB;
 import org.joml.Vector3f;
@@ -133,7 +134,7 @@ public class TriangleRenderer implements IRenderer {
                 TextureTransform.DEFAULT_TEXTURING.getMatrix()
         );
 
-        try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
+        try (RenderPass pass = RenderSystemExtensions.getDevice().createCommandEncoder().createRenderPass(
                 () -> "Triangle Draw",
                 colorView, OptionalInt.empty(),
                 depthView, OptionalDouble.empty())
@@ -142,7 +143,7 @@ public class TriangleRenderer implements IRenderer {
             if (scissorEnabled) {
                 ScissorUtils.enableScissor(pass, scissorX, scissorY, scissorW, scissorH);
             }
-            RenderSystem.bindDefaultUniforms(pass);
+            // TODO: RenderSystem.bindDefaultUniforms not available in NeoForge 1.21.4
             pass.setUniform("DynamicTransforms", dynamicUniforms);
             drawPrepared(pass);
         }

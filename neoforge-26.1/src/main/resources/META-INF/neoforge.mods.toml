@@ -9,6 +9,9 @@ displayName = "OpenLumin"
 description = "High-performance 2D/3D rendering library for Minecraft"
 authors = "NDBlockConnect Team"
 
+[[mixins]]
+config = "openlumin.mixins.json"
+
 [[dependencies.openlumin]]
     modId = "neoforge"
     type = "required"

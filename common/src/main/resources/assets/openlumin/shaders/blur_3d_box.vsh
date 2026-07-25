@@ -1,7 +1,7 @@
 #version 410 core
 
 #moj_import <minecraft:dynamictransforms.glsl>
-#moj_import <minecraft:projection.glsl>
+uniform mat4 ProjMat;
 
 in vec3 Position;
 in vec4 Color;

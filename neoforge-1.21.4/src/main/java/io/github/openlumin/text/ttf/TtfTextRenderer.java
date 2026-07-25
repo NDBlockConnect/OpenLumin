@@ -8,11 +8,11 @@ import io.github.openlumin.text.GlyphDescriptor;
 import io.github.openlumin.text.ITextRenderer;
 
 import io.github.openlumin.utils.render.ScissorUtils;
-import com.mojang.blaze3d.platform.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.systems.RenderPass;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuBuffer;
+import io.github.openlumin.shim.com.mojang.blaze3d.buffers.GpuBufferSlice;
+import io.github.openlumin.shim.com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.platform.GpuTextureView;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuTextureView;
 import net.minecraft.util.ARGB;
 import org.lwjgl.system.MemoryUtil;
 

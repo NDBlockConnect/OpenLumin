@@ -1,8 +1,8 @@
 package io.github.openlumin;
 
-import com.mojang.blaze3d.platform.GpuSampler;
-import com.mojang.blaze3d.platform.GpuTexture;
-import com.mojang.blaze3d.platform.GpuTextureView;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuSampler;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuTexture;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuTextureView;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 
 public class LuminTexture extends AbstractTexture {

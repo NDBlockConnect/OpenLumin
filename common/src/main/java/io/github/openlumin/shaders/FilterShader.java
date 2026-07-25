@@ -1,6 +1,6 @@
 package io.github.openlumin.shaders;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import io.github.openlumin.LuminRenderSystem;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.Std140Builder;
@@ -12,10 +12,11 @@ import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import net.minecraft.client.renderer.DynamicUniformStorage;
+import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import com.mojang.blaze3d.platform.AddressMode;
+import com.mojang.blaze3d.platform.FilterMode;
+import io.github.openlumin.impl.DynamicUniformStorage;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.Identifier;
 
 import java.awt.*;
 import java.nio.ByteBuffer;
@@ -37,9 +38,9 @@ public class FilterShader {
     private void ensureProgram() {
         if (this.pipeline == null) {
             this.pipeline = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
-                    .withLocation(Identifier.of("openlumin", "pipeline/filter"))
-                    .withVertexShader(Identifier.withDefaultNamespace("core/screenquad"))
-                    .withFragmentShader(Identifier.of("openlumin", "filter"))
+                    .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin","pipeline/filter"))
+                    .withVertexShader(ResourceLocation.withDefaultNamespace("core/screenquad"))
+                    .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin","filter"))
                     .withUniform("FilterColor", UniformType.UNIFORM_BUFFER)
                     .withSampler("InputSampler")
                     .withCull(false)
@@ -81,7 +82,7 @@ public class FilterShader {
             return;
         }
 
-        CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
+        CommandEncoder encoder = RenderSystemExtensions.getDevice().createCommandEncoder();
         encoder.copyTextureToTexture(
                 framebuffer.getColorTexture(),
                 this.input.getColorTexture(),
@@ -103,9 +104,12 @@ public class FilterShader {
                 OptionalInt.empty()
         )) {
             renderPass.setPipeline(this.pipeline);
-            RenderSystem.bindDefaultUniforms(renderPass);
+            // TODO: RenderSystem.bindDefaultUniforms not available in NeoForge 1.21.4
             renderPass.setUniform("FilterColor", filterColor);
-            renderPass.bindTexture("InputSampler", this.input.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+            renderPass.bindTexture("InputSampler", this.input.getColorTextureView(),
+                    RenderSystemExtensions.getDevice().createSampler(
+                            AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
+                            FilterMode.LINEAR, FilterMode.LINEAR, 1, java.util.OptionalDouble.empty()));
             renderPass.draw(0, 3);
         }
     }

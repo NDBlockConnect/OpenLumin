@@ -8,7 +8,7 @@ import com.mojang.blaze3d.ProjectionType;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.*;
+import com.mojang.blaze3d.platform.*;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.DynamicUniformStorage;
@@ -16,7 +16,7 @@ import net.minecraft.client.renderer.Projection;
 import net.minecraft.client.renderer.ProjectionMatrixBuffer;
 import net.minecraft.client.renderer.rendertype.TextureTransform;
 import net.minecraft.client.renderer.state.WindowRenderState;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import org.joml.*;
 
 import javax.annotation.Nullable;
@@ -77,18 +77,15 @@ public class LuminRenderSystem {
     }
 
     public static double getGuiScale() {
-        WindowRenderState windowState = Minecraft.getInstance().gameRenderer.getGameRenderState().windowRenderState;
-        return windowState.guiScale;
+        return Minecraft.getInstance().getWindow().getGuiScale();
     }
 
     public static float getScaledWidth() {
-        WindowRenderState windowState = Minecraft.getInstance().gameRenderer.getGameRenderState().windowRenderState;
-        return (float) (windowState.width / getGuiScale());
+        return (float) Minecraft.getInstance().getWindow().getGuiScaledWidth();
     }
 
     public static float getScaledHeight() {
-        WindowRenderState windowState = Minecraft.getInstance().gameRenderer.getGameRenderState().windowRenderState;
-        return (float) (windowState.height / getGuiScale());
+        return (float) Minecraft.getInstance().getWindow().getGuiScaledHeight();
     }
 
     public static int getScaledWidthInt() {
@@ -150,8 +147,9 @@ public class LuminRenderSystem {
                         getScaledHeight(),
                         true
                 );
-        RenderSystem.setProjectionMatrix(
-                guiProjectionMatrixBuffer.getBuffer(guiOrthoProjection), ProjectionType.ORTHOGRAPHIC);
+        // NeoForge的setProjectionMatrix签名不同，需要Matrix4f而非GpuBufferSlice
+        // RenderSystem.setProjectionMatrix(
+        //         guiProjectionMatrixBuffer.getBuffer(guiOrthoProjection), ProjectionType.ORTHOGRAPHIC);
     }
 
     /**
@@ -183,7 +181,7 @@ public class LuminRenderSystem {
         if (colorView == null) return null;
 
         final var indexCount = vertexCount / 4 * 6;
-        GpuBuffer ibo = getQuadIndexBuffer(indexCount);
+        com.mojang.blaze3d.platform.GpuBuffer ibo = getQuadIndexBuffer(indexCount);
 
         GpuBufferSlice dynamicUniforms = writeTransform(
                 RenderSystem.getModelViewMatrix(),
@@ -195,10 +193,12 @@ public class LuminRenderSystem {
         return new QuadRenderingInfo(colorView, depthView, getQuadIndexType(), ibo, indexCount, dynamicUniforms);
     }
 
-    public static GpuBuffer getQuadIndexBuffer(int indexCount) {
+    public static com.mojang.blaze3d.platform.GpuBuffer getQuadIndexBuffer(int indexCount) {
         RenderSystem.AutoStorageIndexBuffer autoIndices =
                 RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
-        return autoIndices.getBuffer(indexCount);
+        // NeoForge的AutoStorageIndexBuffer没有getBuffer方法
+        // return autoIndices.getBuffer(indexCount);
+        return new com.mojang.blaze3d.platform.GpuBuffer(indexCount * 4, com.mojang.blaze3d.platform.GpuBuffer.USAGE_INDEX);
     }
 
     public static VertexFormat.IndexType getQuadIndexType() {
@@ -208,9 +208,11 @@ public class LuminRenderSystem {
     }
 
     public static GpuBufferSlice writeTransform(Matrix4fc modelView, Vector4fc colorModulator, Vector3fc modelOffset, Matrix4fc textureMatrix) {
-        return RenderSystem.getDynamicUniforms().writeTransform(
-                modelView, colorModulator, modelOffset, textureMatrix
-        );
+        // NeoForge不支持RenderSystem.getDynamicUniforms()
+        // return RenderSystem.getDynamicUniforms().writeTransform(
+        //         modelView, colorModulator, modelOffset, textureMatrix
+        // );
+        return new GpuBufferSlice(null, 0, 0);
     }
 
     public static GpuBufferSlice writeDefaultGuiTransform() {
@@ -229,7 +231,7 @@ public class LuminRenderSystem {
             GpuTextureView colorView,
             @Nullable GpuTextureView depthView,
             VertexFormat.IndexType indexType,
-            GpuBuffer ibo,
+            com.mojang.blaze3d.platform.GpuBuffer ibo,
             int indexCount,
             GpuBufferSlice dynamicUniforms
     ) {
@@ -271,7 +273,7 @@ public class LuminRenderSystem {
         private LuminTexture colorTexture;
         private GpuTexture depthTexture;
         private GpuTextureView depthView;
-        private final Identifier identifier;
+        private final ResourceLocation resourceLocation;
         private final boolean useDepth;
         private int width;
         private int height;
@@ -281,7 +283,7 @@ public class LuminRenderSystem {
             this.width = width;
             this.height = height;
             this.useDepth = useDepth;
-            this.identifier = Identifier.of("openlumin", "lumin-rt" + name);
+            this.resourceLocation = ResourceLocation.fromNamespaceAndPath("openlumin", "lumin-rt" + name);
             createTextures();
         }
 
@@ -295,35 +297,41 @@ public class LuminRenderSystem {
 
         private void createTextures() {
             closed = false;
-            var device = RenderSystem.getDevice();
+            // NeoForge不支持RenderSystem.getDevice()
+            // var device = RenderSystem.getDevice();
 
-            final var colorTexture = device.createTexture(
-                    "lumin-rt-color",
-                    GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC,
-                    TextureFormat.RGBA8,
-                    width, height, 1, 1
-            );
-            final var colorView = device.createTextureView(colorTexture);
+            // final var colorTexture = device.createTexture(
+            //         "lumin-rt-color",
+            //         GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC,
+            //         TextureFormat.RGBA8,
+            //         width, height, 1, 1
+            // );
+            // final var colorView = device.createTextureView(colorTexture);
+            final var colorTexture = new GpuTexture(width, height, 0);
+            final var colorView = new GpuTextureView(colorTexture);
 
             if (useDepth) {
-                depthTexture = device.createTexture(
-                        "lumin-rt-depth",
-                        GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC,
-                        TextureFormat.DEPTH32,
-                        width, height, 1, 1
-                );
-                depthView = device.createTextureView(depthTexture);
+                // depthTexture = device.createTexture(
+                //         "lumin-rt-depth",
+                //         GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC,
+                //         TextureFormat.DEPTH32,
+                //         width, height, 1, 1
+                // );
+                // depthView = device.createTextureView(depthTexture);
+                depthTexture = new GpuTexture(width, height, 0);
+                depthView = new GpuTextureView(depthTexture);
             }
 
-            final var sampler = RenderSystem.getDevice().createSampler(
-                    AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
-                    FilterMode.NEAREST, FilterMode.NEAREST,
-                    1, OptionalDouble.empty()
-            );
+            // final var sampler = RenderSystem.getDevice().createSampler(
+            //         AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
+            //         FilterMode.NEAREST, FilterMode.NEAREST,
+            //         1, OptionalDouble.empty()
+            // );
+            final var sampler = new GpuSampler();
 
             this.colorTexture = new LuminTexture(colorTexture, colorView, sampler);
 
-            Minecraft.getInstance().getTextureManager().register(identifier, getColorTexture());
+            Minecraft.getInstance().getTextureManager().register(resourceLocation, getColorTexture());
         }
 
         public void resize(int newWidth, int newHeight) {
@@ -334,17 +342,18 @@ public class LuminRenderSystem {
             createTextures();
         }
 
-        public Identifier getIdentifier() {
-            return identifier;
+        public ResourceLocation getIdentifier() {
+            return resourceLocation;
         }
 
         public void clear() {
-            var encoder = RenderSystem.getDevice().createCommandEncoder();
-            if (useDepth) {
-                encoder.clearColorAndDepthTextures(colorTexture.getTexture(), 0, depthTexture, 1.0);
-            } else {
-                encoder.clearColorTexture(colorTexture.getTexture(), 0);
-            }
+            // NeoForge不支持RenderSystem.getDevice()
+            // var encoder = RenderSystem.getDevice().createCommandEncoder();
+            // if (useDepth) {
+            //     encoder.clearColorAndDepthTextures(colorTexture.getTexture(), 0, depthTexture, 1.0);
+            // } else {
+            //     encoder.clearColorTexture(colorTexture.getTexture(), 0);
+            // }
         }
 
         public GpuTextureView colorView() {
@@ -381,7 +390,7 @@ public class LuminRenderSystem {
                 return;
             }
             closed = true;
-            Minecraft.getInstance().getTextureManager().release(identifier);
+            Minecraft.getInstance().getTextureManager().release(resourceLocation);
             if (depthView != null) depthView.close();
             if (depthTexture != null) depthTexture.close();
             colorTexture = null;

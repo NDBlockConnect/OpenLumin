@@ -1,20 +1,24 @@
 package io.github.openlumin.immediate;
 
 import io.github.openlumin.LuminRenderSystem;
+import io.github.openlumin.LuminVertexFormats;
 import io.github.openlumin.buffer.LuminRingBuffer;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.systems.AutoStorageIndexBuffer;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import com.mojang.blaze3d.platform.GpuTextureView;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
 import net.minecraft.client.renderer.rendertype.TextureTransform;
 import net.minecraft.client.renderer.texture.AbstractTexture;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.renderer.texture.AbstractTextureExtensions;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import org.joml.Matrix4f;
@@ -38,7 +42,7 @@ public final class LuminImmediateRenderer {
     private static final Channel POS_COLOR_TRIANGLE_STRIP = new Channel(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.TRIANGLE_STRIP);
     private static final Channel POS_COLOR_TRIANGLE_FAN = new Channel(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.TRIANGLE_FAN);
     private static final Channel POS_TEX_COLOR_QUADS = new Channel(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS);
-    private static final Channel POS_COLOR_NORMAL_LINE_WIDTH_LINES = new Channel(DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH, VertexFormat.Mode.LINES);
+    private static final Channel POS_COLOR_NORMAL_LINE_WIDTH_LINES = new Channel(LuminVertexFormats.POSITION_COLOR_NORMAL_LINE_WIDTH, VertexFormat.Mode.LINES);
 
     private LuminImmediateRenderer() {
     }
@@ -55,7 +59,7 @@ public final class LuminImmediateRenderer {
         return new PosColorTriangleFan(POS_COLOR_TRIANGLE_FAN.begin(pipeline, null));
     }
 
-    public static PosTexColorQuads beginPosTexColorQuads(RenderPipeline pipeline, Identifier texture) {
+    public static PosTexColorQuads beginPosTexColorQuads(RenderPipeline pipeline, ResourceLocation texture) {
         return new PosTexColorQuads(POS_TEX_COLOR_QUADS.begin(pipeline, texture));
     }
 
@@ -200,7 +204,7 @@ public final class LuminImmediateRenderer {
 
         private RenderPipeline pipeline;
         @Nullable
-        private Identifier texture;
+        private ResourceLocation texture;
 
         private Channel(VertexFormat format, VertexFormat.Mode mode) {
             this.ringBuffer = new LuminRingBuffer(DEFAULT_BUFFER_SIZE, GpuBuffer.USAGE_VERTEX);
@@ -212,14 +216,14 @@ public final class LuminImmediateRenderer {
             this.colorOffset = resolveOffset(format, VertexFormatElement.COLOR);
             this.uvOffset = resolveOffset(format, VertexFormatElement.UV0);
             this.normalOffset = resolveOffset(format, VertexFormatElement.NORMAL);
-            this.lineWidthOffset = resolveOffset(format, VertexFormatElement.LINE_WIDTH);
+            this.lineWidthOffset = resolveOffset(format, LuminVertexFormats.LINE_WIDTH);
         }
 
         private static int resolveOffset(VertexFormat format, VertexFormatElement element) {
             return format.contains(element) ? format.getOffset(element) : -1;
         }
 
-        private Channel begin(RenderPipeline pipeline, @Nullable Identifier texture) {
+        private Channel begin(RenderPipeline pipeline, @Nullable ResourceLocation texture) {
             if (this.building) {
                 throw new IllegalStateException("Immediate channel is already building");
             }
@@ -334,33 +338,33 @@ public final class LuminImmediateRenderer {
                     return;
                 }
 
-                GpuBufferSlice dynamicUniforms = RenderSystem.getDynamicUniforms().writeTransform(
+                GpuBufferSlice dynamicUniforms = RenderSystemExtensions.getDynamicUniforms().writeTransform(
                         RenderSystem.getModelViewMatrix(),
                         new Vector4f(1, 1, 1, 1),
                         new Vector3f(0, 0, 0),
                         TextureTransform.DEFAULT_TEXTURING.getMatrix()
                 );
 
-                try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
+                try (RenderPass pass = RenderSystemExtensions.getDevice().createCommandEncoder().createRenderPass(
                         () -> "Lumin Immediate Draw",
                         colorView, OptionalInt.empty(),
                         depthView, OptionalDouble.empty())
                 ) {
                     pass.setPipeline(this.pipeline);
-                    RenderSystem.bindDefaultUniforms(pass);
+                    // TODO: RenderSystem.bindDefaultUniforms not available in NeoForge 1.21.4
                     pass.setUniform("DynamicTransforms", dynamicUniforms);
                     pass.setVertexBuffer(0, this.ringBuffer.getGpuBuffer());
 
                     if (this.texture != null) {
                         AbstractTexture textureObject = Minecraft.getInstance().getTextureManager().getTexture(this.texture);
-                        pass.bindTexture("Sampler0", textureObject.getTextureView(), textureObject.getSampler());
+                        pass.bindTexture("Sampler0", AbstractTextureExtensions.getTextureView(textureObject), AbstractTextureExtensions.getSampler(textureObject));
                     }
 
                     switch (this.mode) {
                         case LINES, QUADS -> {
                             int indexCount = this.mode.indexCount(this.vertexCount);
                             if (indexCount > 0) {
-                                RenderSystem.AutoStorageIndexBuffer autoIndices = RenderSystem.getSequentialBuffer(this.mode);
+                                AutoStorageIndexBuffer autoIndices = new AutoStorageIndexBuffer(this.mode);
                                 GpuBuffer ibo = autoIndices.getBuffer(indexCount);
                                 pass.setIndexBuffer(ibo, autoIndices.type());
                                 pass.drawIndexed(Math.toIntExact(this.batchStartOffset / this.stride), 0, indexCount, 1);

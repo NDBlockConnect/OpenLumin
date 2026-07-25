@@ -10,8 +10,10 @@ import org.joml.Matrix4fc;
  */
 public interface BakedGlyph extends TextRenderable {
 
-    void render(boolean italic, float x, float y, Matrix4fc matrix, VertexConsumer buffer,
-                float red, float green, float blue, float alpha, int light);
+    default void render(boolean italic, float x, float y, Matrix4fc matrix, VertexConsumer buffer,
+                float red, float green, float blue, float alpha, int light) {
+        // NeoForge使用不同的API - default 以便实现类无需强制覆盖
+    }
 
     default void render(float x, float y, Matrix4fc matrix, VertexConsumer buffer,
                        float red, float green, float blue, float alpha, int light) {

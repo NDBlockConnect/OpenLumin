@@ -1,10 +1,9 @@
 package io.github.openlumin.text.minecraft;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import io.github.openlumin.text.ttf.TtfFontLoader;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.network.chat.Style;
-import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.StringDecomposer;
 import org.jspecify.annotations.Nullable;
@@ -12,7 +11,7 @@ import org.jspecify.annotations.Nullable;
 public final class EpsilonFontMetrics {
 
     private static final float VANILLA_LINE_HEIGHT = 9.0f;
-    private static final Identifier FONT_ID = Identifier.of("openlumin", "fonts/font.ttf");
+    private static final ResourceLocation FONT_ID = ResourceLocation.fromNamespaceAndPath("openlumin","fonts/font.ttf");
 
     public static final float LETTER_SPACING = 0f;
     public static final float SPACE_WIDTH = 3.0f;

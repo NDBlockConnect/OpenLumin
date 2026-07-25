@@ -1,8 +1,11 @@
 # OpenLumin
 
-高性能 Minecraft 2D/3D 渲染库，从 Epsilon HvH 模组中提取并优化。
+[简体中文](README_zh.md) | **English**
 
-OLG | A rendering framework originally designed within NekoyaHouse/Epsilon for Minecraft Java Edition 26.1 and above. We have split it out and maintained it further to facilitate the development of EpsilonBC and allow other mods to rely on OpenLumin for rendering.
+**OpenLumin** is a high-performance 2D/3D rendering library for Minecraft Java Edition mods.  
+Originally extracted from the Epsilon HvH client (NekoyaHouse), now maintained as a standalone library to provide a unified, version-agnostic rendering API for any mod.
+
+> **v26.0 Alpha 1** — Fabric 1.21.10 is now available. More platforms coming soon.
 
 ## 特性
 

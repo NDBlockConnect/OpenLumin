@@ -1,6 +1,6 @@
 package io.github.openlumin.shaders;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import io.github.openlumin.LuminRenderSystem;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.Std140Builder;
@@ -11,11 +11,11 @@ import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import net.minecraft.client.renderer.DynamicUniformStorage;
+import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import com.mojang.blaze3d.platform.AddressMode;
+import com.mojang.blaze3d.platform.FilterMode;
+import io.github.openlumin.impl.DynamicUniformStorage;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.Identifier;
 
 import java.nio.ByteBuffer;
 import java.util.OptionalInt;
@@ -26,8 +26,8 @@ public class FXAAShader {
 
     public static final FXAAShader INSTANCE = new FXAAShader();
 
-    private static final Identifier vertexShader = Identifier.withDefaultNamespace("core/screenquad");
-    private static final Identifier fragmentShader = Identifier.of("openlumin", "fxaa");
+    private static final ResourceLocation vertexShader = ResourceLocation.withDefaultNamespace("core/screenquad");
+    private static final ResourceLocation fragmentShader = ResourceLocation.fromNamespaceAndPath("openlumin","fxaa");
 
     private static final int UNIFORMS_SIZE = new Std140SizeCalculator()
             .putVec4()
@@ -39,7 +39,7 @@ public class FXAAShader {
     private void ensureProgram() {
         if (this.pipeline == null) {
             this.pipeline = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
-                    .withLocation(Identifier.of("openlumin", "pipeline/fxaa"))
+                    .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin","pipeline/fxaa"))
                     .withVertexShader(vertexShader)
                     .withFragmentShader(fragmentShader)
                     .withUniform("FxaaInfo", UniformType.UNIFORM_BUFFER)
@@ -83,7 +83,7 @@ public class FXAAShader {
             return;
         }
 
-        CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
+        CommandEncoder encoder = RenderSystemExtensions.getDevice().createCommandEncoder();
         encoder.copyTextureToTexture(
                 framebuffer.getColorTexture(),
                 this.input.getColorTexture(),
@@ -105,9 +105,12 @@ public class FXAAShader {
                 OptionalInt.empty()
         )) {
             renderPass.setPipeline(this.pipeline);
-            RenderSystem.bindDefaultUniforms(renderPass);
+            // TODO: RenderSystem.bindDefaultUniforms not available in NeoForge 1.21.4
             renderPass.setUniform("FxaaInfo", fxaaInfo);
-            renderPass.bindTexture("InputSampler", this.input.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+            renderPass.bindTexture("InputSampler", this.input.getColorTextureView(),
+                    RenderSystemExtensions.getDevice().createSampler(
+                            AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
+                            FilterMode.LINEAR, FilterMode.LINEAR, 1, java.util.OptionalDouble.empty()));
             renderPass.draw(0, 3);
         }
     }

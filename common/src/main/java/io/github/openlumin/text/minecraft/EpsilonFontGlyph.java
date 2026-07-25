@@ -7,8 +7,8 @@ import io.github.openlumin.text.ttf.TtfGlyphAtlas;
 
 import com.mojang.blaze3d.font.GlyphInfo;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.textures.GpuSampler;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.platform.GpuSampler;
+import com.mojang.blaze3d.platform.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.font.TextRenderable;
@@ -16,11 +16,13 @@ import net.minecraft.client.gui.font.glyphs.BakedGlyph;
 import net.minecraft.client.renderer.rendertype.RenderSetup;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.network.chat.Style;
+import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.jspecify.annotations.Nullable;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 public final class EpsilonFontGlyph implements BakedGlyph {
 
@@ -60,12 +62,12 @@ public final class EpsilonFontGlyph implements BakedGlyph {
         return descriptor != null ? new EpsilonFontGlyph(codepoint, font, descriptor) : null;
     }
 
-    @Override
+    // Fabric专属方法（NeoForge父接口无此方法）
     public GlyphInfo info() {
         return this.info;
     }
 
-    @Override
+    // Fabric专属方法
     public TextRenderable.@Nullable Styled createGlyph(float x, float y, int color, int shadowColor, Style style, float boldOffset, float shadowOffset) {
         if (this.descriptor == null) {
             return null;
@@ -73,7 +75,7 @@ public final class EpsilonFontGlyph implements BakedGlyph {
         return new GlyphInstance(this, x, y, color, shadowColor, style, boldOffset, shadowOffset);
     }
 
-    private RenderType renderType() {
+    public RenderType renderType() {
         if (this.descriptor == null) {
             throw new IllegalStateException("Whitespace glyphs do not have render types");
         }
@@ -168,10 +170,10 @@ public final class EpsilonFontGlyph implements BakedGlyph {
         float shearBottom = instance.style.isItalic() ? italicShearBottom(y1 - instance.y) : 0.0f;
 
         TtfGlyphAtlas.GlyphUV uv = this.descriptor.uv();
-        buffer.addVertex(pose, x0 + shearTop - extraThickness, y0 - extraThickness, z).setUv(uv.u0(), uv.v0()).setColor(color);
-        buffer.addVertex(pose, x0 + shearBottom - extraThickness, y1 + extraThickness, z).setUv(uv.u0(), uv.v1()).setColor(color);
-        buffer.addVertex(pose, x1 + shearBottom + extraThickness, y1 + extraThickness, z).setUv(uv.u1(), uv.v1()).setColor(color);
-        buffer.addVertex(pose, x1 + shearTop + extraThickness, y0 - extraThickness, z).setUv(uv.u1(), uv.v0()).setColor(color);
+        buffer.addVertex((Matrix4f) pose, x0 + shearTop - extraThickness, y0 - extraThickness, z).setUv(uv.u0(), uv.v0()).setColor(color);
+        buffer.addVertex((Matrix4f) pose, x0 + shearBottom - extraThickness, y1 + extraThickness, z).setUv(uv.u0(), uv.v1()).setColor(color);
+        buffer.addVertex((Matrix4f) pose, x1 + shearBottom + extraThickness, y1 + extraThickness, z).setUv(uv.u1(), uv.v1()).setColor(color);
+        buffer.addVertex((Matrix4f) pose, x1 + shearTop + extraThickness, y0 - extraThickness, z).setUv(uv.u1(), uv.v0()).setColor(color);
     }
 
     private record GlyphInstance(
@@ -189,7 +191,7 @@ public final class EpsilonFontGlyph implements BakedGlyph {
             return this.shadowColor != 0;
         }
 
-        @Override
+        // Fabric专属方法
         public void render(Matrix4fc pose, VertexConsumer buffer, int packedLightCoords, boolean flat) {
             float depth;
             if (this.hasShadow()) {
@@ -205,12 +207,12 @@ public final class EpsilonFontGlyph implements BakedGlyph {
             }
         }
 
-        @Override
+        // Fabric专属方法
         public RenderType renderType(Font.DisplayMode displayMode) {
             return this.glyph.renderType();
         }
 
-        @Override
+        // Fabric专属方法
         public GpuTextureView textureView() {
             if (this.glyph.descriptor == null) {
                 throw new IllegalStateException("Whitespace glyphs do not have textures");
@@ -226,34 +228,34 @@ public final class EpsilonFontGlyph implements BakedGlyph {
             return this.glyph.descriptor.atlas().getTexture().getSampler();
         }
 
-        @Override
+        // Fabric专属方法
         public RenderPipeline guiPipeline() {
             return ClientSetting.INSTANCE.fontAntiAliasing.getValue()
                     ? LuminRenderPipelines.TTF_FONT_AA
                     : LuminRenderPipelines.TTF_FONT_NO_AA;
         }
 
-        @Override
+        // Fabric专属方法
         public float left() {
             return this.glyph.left(this.x, this.style.isBold(), this.style.isItalic());
         }
 
-        @Override
+        // Fabric专属方法
         public float top() {
             return this.glyph.top(this.y);
         }
 
-        @Override
+        // Fabric专属方法
         public float right() {
             return this.glyph.right(this.x, this.hasShadow(), this.shadowOffset, this.style.isBold(), this.style.isItalic());
         }
 
-        @Override
+        // Fabric专属方法
         public float activeRight() {
             return this.x + this.glyph.info.getAdvance(this.style.isBold());
         }
 
-        @Override
+        // Fabric专属方法
         public float bottom() {
             return this.glyph.bottom(this.y, this.hasShadow(), this.shadowOffset, this.style.isBold());
         }
@@ -273,6 +275,11 @@ public final class EpsilonFontGlyph implements BakedGlyph {
         @Override
         public float getShadowOffset() {
             return SHADOW_OFFSET;
+        }
+
+        @Override
+        public BakedGlyph bake(Function<com.mojang.blaze3d.font.SheetGlyphInfo, BakedGlyph> function) {
+            return null;
         }
     }
 }

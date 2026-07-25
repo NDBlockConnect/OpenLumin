@@ -6,7 +6,7 @@ import io.github.openlumin.text.StaticFontLoader;
 import io.github.openlumin.text.ttf.TtfFontLoader;
 import io.github.openlumin.text.ttf.TtfTextRenderer;
 import io.github.openlumin.holders.RendererHolder;
-import com.mojang.blaze3d.systems.RenderPass;
+import io.github.openlumin.shim.com.mojang.blaze3d.systems.RenderPass;
 
 import java.awt.*;
 

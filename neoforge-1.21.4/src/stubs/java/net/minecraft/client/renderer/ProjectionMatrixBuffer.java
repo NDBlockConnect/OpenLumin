@@ -1,7 +1,5 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-
 /**
  * NeoForge适配层：模拟Fabric的ProjectionMatrixBuffer API
  */
@@ -13,9 +11,9 @@ public class ProjectionMatrixBuffer {
         this.name = name;
     }
 
-    public GpuBufferSlice getBuffer(Projection projection) {
+    public org.joml.Matrix4f getBuffer(Projection projection) {
         // NeoForge使用不同的API
-        return new GpuBufferSlice(null, 0, 0);
+        return new org.joml.Matrix4f();
     }
 
     public void close() {

@@ -14,6 +14,9 @@
   "license": "GPL-3.0-only",
   "environment": "*",
   "entrypoints": {
+    "client": [
+      "io.github.openlumin.impl.Fabric1214Platform"
+    ]
   },
   "depends": {
     "fabricloader": ">=0.15.0",

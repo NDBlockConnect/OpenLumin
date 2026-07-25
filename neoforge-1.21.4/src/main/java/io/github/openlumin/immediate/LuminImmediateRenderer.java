@@ -1,19 +1,20 @@
 package io.github.openlumin.immediate;
 
+import io.github.openlumin.LuminPipeline;
 import io.github.openlumin.LuminRenderSystem;
 import io.github.openlumin.buffer.LuminRingBuffer;
 import io.github.openlumin.shaders.ShaderProgram;
-import com.mojang.blaze3d.platform.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.systems.RenderPass;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuBuffer;
+import io.github.openlumin.shim.com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.platform.GpuTextureView;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuTextureView;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
-import net.minecraft.client.renderer.rendertype.TextureTransform;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import io.github.openlumin.shim.net.minecraft.client.renderer.rendertype.TextureTransform;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ARGB;
@@ -22,16 +23,16 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.lwjgl.opengl.*;
+import org.lwjgl.opengl.GL32;
 import org.lwjgl.system.MemoryUtil;
 
 import javax.annotation.Nullable;
 import java.nio.ByteOrder;
-import java.util.OptionalDouble;
-import java.util.OptionalInt;
-
 import net.minecraft.client.Minecraft;
 
 public final class LuminImmediateRenderer {
+
+    private static final Logger LOGGER = LogManager.getLogger("OpenLumin");
 
     private static final long DEFAULT_BUFFER_SIZE = 1024 * 1024;
     private static final boolean LITTLE_ENDIAN = ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN;
@@ -46,23 +47,23 @@ public final class LuminImmediateRenderer {
     private LuminImmediateRenderer() {
     }
 
-    public static PosColorQuads beginPosColorQuads(RenderPipeline pipeline) {
+    public static PosColorQuads beginPosColorQuads(LuminPipeline pipeline) {
         return new PosColorQuads(POS_COLOR_QUADS.begin(pipeline, null));
     }
 
-    public static PosColorTriangleStrip beginPosColorTriangleStrip(RenderPipeline pipeline) {
+    public static PosColorTriangleStrip beginPosColorTriangleStrip(LuminPipeline pipeline) {
         return new PosColorTriangleStrip(POS_COLOR_TRIANGLE_STRIP.begin(pipeline, null));
     }
 
-    public static PosColorTriangleFan beginPosColorTriangleFan(RenderPipeline pipeline) {
+    public static PosColorTriangleFan beginPosColorTriangleFan(LuminPipeline pipeline) {
         return new PosColorTriangleFan(POS_COLOR_TRIANGLE_FAN.begin(pipeline, null));
     }
 
-    public static PosTexColorQuads beginPosTexColorQuads(RenderPipeline pipeline, ResourceLocation texture) {
+    public static PosTexColorQuads beginPosTexColorQuads(LuminPipeline pipeline, ResourceLocation texture) {
         return new PosTexColorQuads(POS_TEX_COLOR_QUADS.begin(pipeline, texture));
     }
 
-    public static Lines beginLines(RenderPipeline pipeline) {
+    public static Lines beginLines(LuminPipeline pipeline) {
         return new Lines(POS_COLOR_NORMAL_LINE_WIDTH_LINES.begin(pipeline, null));
     }
 
@@ -201,7 +202,7 @@ public final class LuminImmediateRenderer {
 
         private long vertexBaseAddr;
 
-        private RenderPipeline pipeline;
+        private LuminPipeline pipeline;
         @Nullable
         private ResourceLocation texture;
 
@@ -223,7 +224,7 @@ public final class LuminImmediateRenderer {
             return format.contains(element) ? format.getOffset(element) : -1;
         }
 
-        private Channel begin(RenderPipeline pipeline, @Nullable ResourceLocation texture) {
+        private Channel begin(LuminPipeline pipeline, @Nullable ResourceLocation texture) {
             if (this.building) {
                 throw new IllegalStateException("Immediate channel is already building");
             }
@@ -331,14 +332,7 @@ public final class LuminImmediateRenderer {
                     this.ringBuffer.unmap();
                 }
 
-                GpuTextureView colorView = LuminRenderSystem.resolveColorView();
-                GpuTextureView depthView = LuminRenderSystem.resolveDepthView();
-
-                if (colorView == null) {
-                    return;
-                }
-
-                // NeoForge实现：使用直接OpenGL调用
+                // NeoForge 1.21.4: OpenGL 直接绘制路径不依赖 colorView/depthView，直接绘制
                 submittedDraw = drawWithOpenGL();
 
             } finally {
@@ -362,63 +356,96 @@ public final class LuminImmediateRenderer {
         }
 
         private boolean drawWithOpenGL() {
-            // 启用混合模式
+            // ── 1. Compile / fetch shader from pipeline ──────────────────────────
+            io.github.openlumin.shaders.ShaderProgram program =
+                LuminRenderSystem.getOrCompileShader(this.pipeline);
+            if (program == null) {
+                LOGGER.error("[OpenLumin] No shader for pipeline {} — draw skipped",
+                    this.pipeline != null ? this.pipeline.getLocation() : "null");
+                return false;
+            }
+
+            // ── 2. GL state ────────────────────────────────────────────────────────
             GL11.glEnable(GL11.GL_BLEND);
             GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 
-            // 创建并配置VAO
+            // ── 3. VAO setup ───────────────────────────────────────────────────────
             int vao = GL30.glGenVertexArrays();
             GL30.glBindVertexArray(vao);
 
-            // 绑定vertex buffer
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.ringBuffer.getGpuBuffer().getBufferId());
 
-            // 配置顶点属性（基于format）
+            // Position (location 0)
             if (this.positionOffset >= 0) {
                 GL20.glEnableVertexAttribArray(0);
                 GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, this.stride, this.positionOffset);
             }
 
+            // UV (location 1) if present
+            int colorAttribLoc;
             if (this.uvOffset >= 0) {
                 GL20.glEnableVertexAttribArray(1);
                 GL20.glVertexAttribPointer(1, 2, GL11.GL_FLOAT, false, this.stride, this.uvOffset);
+                colorAttribLoc = 2;
+            } else {
+                colorAttribLoc = 1;
             }
 
+            // Color
             if (this.colorOffset >= 0) {
-                int colorLocation = (this.uvOffset >= 0) ? 2 : 1;
-                GL20.glEnableVertexAttribArray(colorLocation);
-                GL20.glVertexAttribPointer(colorLocation, 4, GL11.GL_UNSIGNED_BYTE, true, this.stride, this.colorOffset);
+                GL20.glEnableVertexAttribArray(colorAttribLoc);
+                GL20.glVertexAttribPointer(colorAttribLoc, 4, GL11.GL_UNSIGNED_BYTE, true,
+                                           this.stride, this.colorOffset);
             }
 
-            // 绑定纹理（如果有）
+            // ── 4. Bind shader ─────────────────────────────────────────────────────
+            program.use();
+
+            // ── 5. Set ModelViewMat uniform ────────────────────────────────────────
+            // 顶点数据已在 CPU 端用 matrix.transformPosition 预变换（view-space），
+            // shader 中不能再乘一次 MV，否则双重变换。传单位矩阵给 ModelViewMat。
+            int mvLoc = program.getUniformLocation("ModelViewMat");
+            if (mvLoc >= 0) {
+                float[] identity = { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
+                GL20.glUniformMatrix4fv(mvLoc, false, identity);
+            }
+
+            // ── 6. Set ProjMat uniform ─────────────────────────────────────────────
+            int projLoc = program.getUniformLocation("ProjMat");
+            if (projLoc >= 0) {
+                float[] projArr = new float[16];
+                RenderSystem.getProjectionMatrix().get(projArr);
+                GL20.glUniformMatrix4fv(projLoc, false, projArr);
+            }
+
+            // ── 7. Bind texture if needed ──────────────────────────────────────────
             if (this.texture != null) {
                 AbstractTexture textureObject = Minecraft.getInstance().getTextureManager().getTexture(this.texture);
                 GL13.glActiveTexture(GL13.GL_TEXTURE0);
                 GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureObject.getId());
+                program.setSamplerUnit("Sampler0", 0);
             }
 
-            // 执行绘制
+            // ── 8. Draw ────────────────────────────────────────────────────────────
             boolean drawn = false;
             int firstVertex = Math.toIntExact(this.batchStartOffset / this.stride);
 
             switch (this.mode) {
+                case QUADS -> {
+                    int indexCount = this.mode.indexCount(this.vertexCount);
+                    if (indexCount > 0) {
+                        // batchStartOffset 是当前批次在 VBO 中的字节偏移。
+                        // IBO 索引从 0 开始，必须用 glDrawElementsBaseVertex 把索引偏移到正确的顶点起点。
+                        int baseVertex = Math.toIntExact(this.batchStartOffset / this.stride);
+                        io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuBuffer ibo = LuminRenderSystem.getQuadIndexBuffer(indexCount);
+                        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, ibo.getBufferId());
+                        GL32.glDrawElementsBaseVertex(GL11.GL_TRIANGLES, indexCount, GL11.GL_UNSIGNED_SHORT, 0L, baseVertex);
+                        drawn = true;
+                    }
+                }
                 case LINES -> {
                     GL11.glDrawArrays(GL11.GL_LINES, firstVertex, this.vertexCount);
                     drawn = true;
-                }
-                case QUADS -> {
-                    // QUADS需要使用index buffer
-                    int indexCount = this.mode.indexCount(this.vertexCount);
-                    if (indexCount > 0) {
-                        RenderSystem.AutoStorageIndexBuffer autoIndices = RenderSystem.getSequentialBuffer(this.mode);
-                        com.mojang.blaze3d.platform.GpuBuffer ibo = LuminRenderSystem.getQuadIndexBuffer(indexCount);
-                        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, ibo.getBufferId());
-
-                        int indexType = autoIndices.type() == VertexFormat.IndexType.INT
-                            ? GL11.GL_UNSIGNED_INT : GL11.GL_UNSIGNED_SHORT;
-                        GL11.glDrawElements(GL11.GL_TRIANGLES, indexCount, indexType, 0);
-                        drawn = true;
-                    }
                 }
                 case TRIANGLE_STRIP -> {
                     GL11.glDrawArrays(GL11.GL_TRIANGLE_STRIP, firstVertex, this.vertexCount);
@@ -434,7 +461,8 @@ public final class LuminImmediateRenderer {
                 }
             }
 
-            // 清理
+            // ── 9. Cleanup ─────────────────────────────────────────────────────────
+            GL20.glUseProgram(0);
             GL30.glBindVertexArray(0);
             GL30.glDeleteVertexArrays(vao);
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);

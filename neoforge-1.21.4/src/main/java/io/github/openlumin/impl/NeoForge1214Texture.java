@@ -27,12 +27,21 @@ public class NeoForge1214Texture implements TextureApi {
     }
 
     @Override
-    public void uploadTexture(TextureHandle handle, ByteBuffer pixels) {
+    public void uploadTexture(TextureHandle handle, int width, int height, ByteBuffer pixels) {
         RenderSystem.assertOnRenderThread();
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, (Integer) handle.nativeHandle());
         GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0,
-                            0, 0, // 实际应用需要宽高参数
-                            GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
+                width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+    }
+
+    @Override
+    public void uploadTextureSub(TextureHandle handle, int offsetX, int offsetY,
+                                 int width, int height, ByteBuffer pixels) {
+        RenderSystem.assertOnRenderThread();
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, (Integer) handle.nativeHandle());
+        GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, offsetX, offsetY,
+                width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
     }
 
@@ -88,9 +97,9 @@ public class NeoForge1214Texture implements TextureApi {
 
     private int toGlWrap(WrapMode wrap) {
         return switch (wrap) {
-            case CLAMP -> com.mojang.blaze3d.opengl.GlStateManager.GL_CLAMP_TO_EDGE;
+            case CLAMP -> io.github.openlumin.shim.com.mojang.blaze3d.opengl.GlStateManager.GL_CLAMP_TO_EDGE;
             case REPEAT -> GL11.GL_REPEAT;
-            case MIRROR -> com.mojang.blaze3d.opengl.GlStateManager.GL_MIRRORED_REPEAT;
+            case MIRROR -> io.github.openlumin.shim.com.mojang.blaze3d.opengl.GlStateManager.GL_MIRRORED_REPEAT;
         };
     }
 }

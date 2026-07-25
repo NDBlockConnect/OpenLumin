@@ -45,14 +45,25 @@ USER.md
 memory/
 .claude/
 
-# AI 生成的临时文档
+# AI 生成的文档
 PROGRESS.md
 IMPLEMENTATION_STATUS.md
+
+# 误提取到根目录的编译产物
+net/
+
+# 临时迁移脚本
+migrate_shim*.py
+restore_stubs.py
 NEOFORGE_IMPLEMENTATION_PLAN.md
 PROGRESS_SUMMARY.md
 *_SUMMARY.md
 *_STATUS.md
 *_PLAN.md
+API_DESIGN.md
+ARCHITECTURE.md
+BUILD_STATUS.md
+CODE_ISOLATION.md
 
 # 临时脚本和分析文件
 analyze-dependencies.py

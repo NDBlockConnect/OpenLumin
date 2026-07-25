@@ -3,10 +3,10 @@ package io.github.openlumin.text.ttf;
 import io.github.openlumin.LuminTexture;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.platform.AddressMode;
-import com.mojang.blaze3d.platform.FilterMode;
-import com.mojang.blaze3d.platform.GpuTexture;
-import com.mojang.blaze3d.platform.TextureFormat;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.AddressMode;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.FilterMode;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuTexture;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.TextureFormat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.system.MemoryUtil;
@@ -34,7 +34,7 @@ public class TtfGlyphAtlas {
         // 使用占位值代替
         final var texture = new GpuTexture(SIZE, SIZE);
         final var textureView = texture.createView();
-        final var sampler = new com.mojang.blaze3d.platform.GpuSampler();
+        final var sampler = new io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuSampler();
 
         /*
         final var texture = RenderSystem.getDevice().createTexture(

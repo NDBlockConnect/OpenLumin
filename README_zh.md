@@ -1,106 +1,94 @@
-# Lumin Graphics
+# OpenLumin
 
-[English](README.md) | **简体中文**
+**English** | [简体中文](README_zh.md)
 
-Lumin Graphics 是一个为现代 Minecraft 模组开发设计的轻量化、高性能渲染框架。
+**OpenLumin** 是专为 Minecraft Java Edition 模组设计的高性能 2D/3D 渲染库。  
+最初从 Epsilon HvH 客户端（NekoyaHouse）中提取，现作为独立库维护，为任意模组提供统一、跨版本的渲染 API。
+
+> **v26.0 Alpha 1** — Fabric 1.21.10 现已发布，更多平台持续接入中。
 
 ---
 
 ## 核心特性
 
-* **SDF 圆角矩形**：通过片段着色器（Fragment Shader）计算平滑且抗锯齿的圆角。支持动态半径，无需改变顶点数据。
-* **高性能 TTF 渲染**：先进的 TrueType 字体渲染技术，采用图集（Atlas）批处理机制，显著降低绘制调用（Draw Calls）。
+| 特性 | 说明 |
+|------|------|
+| 🎨 **2D 即时渲染** | 矩形、圆角矩形、椭圆、弧形、阴影、渐变，一行代码完成 |
+| ✏️ **TTF 字体渲染** | 加载系统/自定义 TTF，支持 SDF 抗锯齿，图集批处理 |
+| 🌍 **3D 世界渲染** | 线框盒体、填充盒体、自由线段，世界空间直接绘制 |
+| ✨ **后处理特效** | 高斯模糊、FXAA 抗锯齿、颜色滤镜 |
+| 🎬 **动态 GLSL Sandbox** | 运行时编译自定义着色器，内置程序化背景特效 |
+| 📦 **声明式调度器** | `Render2DScheduler` 按 layer 批量提交，自动合批 |
+| 🔄 **跨平台/跨版本** | Fabric / NeoForge / Forge，MC 1.14 ~ 1.21.10 |
 
 ---
 
-## 💡警告
+## 当前发布状态
 
-### 生命周期同步限制
-
-在单帧渲染循环内，尽可能不在调用一次或多次 Renderer.draw() 之后再调用 Renderer.clear()
-并再次对同一个实例调用 draw()。这会导致单帧内使用多个 Buffers 导致 In-Fight 优化力度减少
-
-如果业务逻辑确实需要在单帧内进行多轮清理与绘制：
-
-建议实例化一个新的 Renderer 来处理后续任务。
-
-**💡注意**： 请避免创建过多的 Renderer 实例，否则会造成显存空间的过度占用，
-或者你可以在创建 Renderer 实例时设置比默认值更小的 Buffer 大小。
+| 平台 | MC 版本 | 状态 |
+|------|---------|------|
+| Fabric | 1.21.10 | ✅ **Alpha 1** |
+| NeoForge | 1.21.10 | 🔧 开发中 |
+| 其他版本 | - | 🗓 规划中 |
 
 ---
 
-## 快速上手
+## 快速接入（下游模组）
 
-Lumin Graphics 的所有渲染操作均通过专门的 **Renderer（渲染器）** 完成。
+### 1. 添加依赖
 
-### 可用渲染器
+**`build.gradle.kts`**：
+```kotlin
+repositories {
+    maven("https://jitpack.io")
+    // 或 maven("https://github.com/NDBlockConnect/OpenLumin/releases")
+}
 
-* `RectRenderer`：针对标准扁平矩形进行了优化。
-* `RoundRectRenderer`：用于具有动态圆角半径且抗锯齿的矩形。
-* `TtfTextRenderer`：用于高性能的 TrueType 字体渲染。
-* `TextureRenderer`：用于批量绘制不同贴图
-
-### 初始化与线程安全
-
-渲染器 **必须** 在 **渲染线程（Render Thread）** 上进行初始化。我们建议使用 `Suppliers.memoize`（来自 Guava 或 Minecraft
-库）来确保安全且延迟的初始化。
-
-```java
-// 推荐的初始化方式
-private final Supplier<RectRenderer> rectRenderer = Suppliers.memoize(RectRenderer::new);
-
-// 使用 .get() 获取渲染器实例
-rectRenderer.get().addRect(10f,10f,100f,100f,Color.WHITE);
-
+dependencies {
+    modImplementation("io.github.openlumin:openlumin-fabric-1.21.10:1.0.0")
+}
 ```
 
----
-
-### 使用方式
-
-#### 1. 基础绘制与重置
-
-对于大多数即时模式（Immediate-mode）的 UI 任务，你需要在同一帧内添加形状并清理缓冲区：
-
-```java
-// 1. 向缓冲区添加形状
-rectRenderer.get().addRect(10f,10f,200f,200f,Color.WHITE);
-
-// 2. 绘制到屏幕并在下一帧前清理数据
-rectRenderer.get().draw();
-rectRenderer.get().clear();
-
-// 你也可以直接使用 drawAndClear()
-rectRenderer.get().drawAndClear();
-
+**`fabric.mod.json`**：
+```json
+{
+  "depends": {
+    "openlumin": ">=1.0.0"
+  }
+}
 ```
 
-#### 2. 缓冲区复用
+### 2. 最简示例
 
-如果你的 UI 内容并非每帧都在变化，你可以只添加一次顶点，并在后续帧中多次绘制，从而节省 CPU Overhead。
+在 `RenderGuiEvent`（Fabric：`HudRenderCallback`）中绘制一个圆角矩形：
 
 ```java
-// 在初始化阶段或首帧中：
-rectRenderer.get().addRect(10f,10f,200f,200f,Color.CYAN);
+import io.github.openlumin.OpenLumin;
+import io.github.openlumin.LuminRenderSystem;
 
-// 在渲染循环中：
-rectRenderer.get().draw(); // 内容会一直保存在 GPU 缓冲区中，直到调用 .clear()
-
+// 在 HUD 渲染回调中：
+LuminRenderSystem.applyOrthoProjection();
+OpenLumin.draw.roundRect(10, 10, 200, 50, 8, new Color(0x44, 0x88, 0xFF));
 ```
 
----
-
-### 💡 优化建议
-
-在使用 **Lumin Graphics** 时请记住：多次调用 `.draw()` 而不调用 `.clear()` 是极其高效的。它仅会重新触发现有 GPU
-数据的绘制指令，而无需重新上传顶点数据。
+更多示例见 [快速上手指南](docs/GETTING_STARTED.md)。
 
 ---
 
-## 开源协议
+## 文档
 
-* **Lumin Graphics** 采用 [GNU General Public License v3.0](LICENSE) 协议。
+- 📖 [快速上手指南](docs/GETTING_STARTED.md) — 完整接入流程，含代码示例
+- 📚 [API 参考手册](docs/API_REFERENCE.md) — 所有公开 API 的完整说明
+- 📋 [更新日志](CHANGELOG.md)
 
 ---
 
-Copyright © 2026 NekoyaHouse.
+## 许可证
+
+本项目采用 [GPL-3.0-only](LICENSE) 协议。
+
+---
+
+## 致谢
+
+本库从 Epsilon HvH 模组提取，感谢原作者 Chen_Meng 和 06789 的贡献。

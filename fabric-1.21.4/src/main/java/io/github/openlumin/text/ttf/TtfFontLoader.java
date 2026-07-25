@@ -2,7 +2,7 @@ package io.github.openlumin.text.ttf;
 
 import io.github.openlumin.text.GlyphDescriptor;
 import io.github.openlumin.text.IFontLoader;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.stb.STBTruetype;
 
 import java.nio.file.Path;
@@ -47,7 +47,7 @@ public class TtfFontLoader implements IFontLoader {
     private static long uploadFrameId = Long.MIN_VALUE;
     private static int glyphUploadsThisFrame;
 
-    public TtfFontLoader(Identifier ttfFile) {
+    public TtfFontLoader(ResourceLocation ttfFile) {
         this.fontFile = new TtfFontFile(ttfFile, 48, 4);
         Arrays.fill(asciiAdvanceMap, ADVANCE_UNSET);
     }

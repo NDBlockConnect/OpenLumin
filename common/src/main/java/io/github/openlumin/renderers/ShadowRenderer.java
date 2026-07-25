@@ -9,6 +9,7 @@ import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.systems.RenderSystemExtensions;
 import net.minecraft.util.ARGB;
 import org.lwjgl.system.MemoryUtil;
 
@@ -106,12 +107,12 @@ public class ShadowRenderer implements IRenderer {
         if (scissorEnabled && !ScissorUtils.isVisible(scissorW, scissorH)) return;
 
         try {
-            try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
+            try (RenderPass pass = RenderSystemExtensions.getDevice().createCommandEncoder().createRenderPass(
                     () -> "Lumin Shadow Draw", info.colorView(), OptionalInt.empty(),
                     info.depthView(), OptionalDouble.empty())
             ) {
                 pass.setPipeline(LuminRenderPipelines.SHADOW);
-                RenderSystem.bindDefaultUniforms(pass);
+                // TODO: RenderSystem.bindDefaultUniforms not available in NeoForge 1.21.4
                 pass.setUniform("DynamicTransforms", info.dynamicUniforms());
                 drawPrepared(pass, info);
             }

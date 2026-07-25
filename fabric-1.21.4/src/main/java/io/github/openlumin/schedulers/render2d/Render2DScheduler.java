@@ -8,7 +8,8 @@ import io.github.openlumin.text.ttf.TtfFontLoader;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import com.mojang.blaze3d.platform.GpuTextureView;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -31,6 +32,8 @@ public final class Render2DScheduler implements AutoCloseable {
             Render2DCommandKind.SHADOW,
             Render2DCommandKind.ROUND_RECT,
             Render2DCommandKind.ROUND_RECT_OUTLINE,
+            Render2DCommandKind.ELLIPSE,
+            Render2DCommandKind.ARC,
             Render2DCommandKind.RECT,
             Render2DCommandKind.TRIANGLE,
             Render2DCommandKind.TEXTURE,
@@ -176,13 +179,13 @@ public final class Render2DScheduler implements AutoCloseable {
         }
 
         GpuTextureView depthView = pipeline == LuminRenderPipelines.TEXTURE ? null : LuminRenderSystem.resolveDepthView();
-        try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
+        try (RenderPass pass = RenderSystemExtensions.getDevice().createCommandEncoder().createRenderPass(
                 () -> "Lumin 2D Pipeline Run",
                 colorView, OptionalInt.empty(),
                 depthView, OptionalDouble.empty())
         ) {
             pass.setPipeline(pipeline);
-            RenderSystem.bindDefaultUniforms(pass);
+            // TODO: RenderSystem.bindDefaultUniforms not available in NeoForge 1.21.4
             for (int i = start; i < end; i++) {
                 batches.get(i).renderers().draw(pass);
             }
@@ -194,6 +197,8 @@ public final class Render2DScheduler implements AutoCloseable {
             case SHADOW -> LuminRenderPipelines.SHADOW;
             case ROUND_RECT -> LuminRenderPipelines.ROUND_RECT;
             case ROUND_RECT_OUTLINE -> LuminRenderPipelines.ROUND_RECT_OUTLINE;
+            case ELLIPSE -> LuminRenderPipelines.ELLIPSE;
+            case ARC -> LuminRenderPipelines.ARC;
             case RECT -> LuminRenderPipelines.RECTANGLE;
             case TRIANGLE -> LuminRenderPipelines.TRIANGLE;
             case TEXTURE -> LuminRenderPipelines.TEXTURE;
@@ -213,10 +218,21 @@ public final class Render2DScheduler implements AutoCloseable {
                     rect.radiusTopLeft(), rect.radiusTopRight(), rect.radiusBottomRight(), rect.radiusBottomLeft(),
                     rect.topLeft(), rect.bottomLeft(), rect.bottomRight(), rect.topRight()
             );
-            case Render2DCommand.RoundRectOutline outline -> renderers.roundRectOutlineRenderer().addOutline(
-                    outline.bounds().x(), outline.bounds().y(), outline.bounds().width(), outline.bounds().height(),
-                    outline.radiusTopLeft(), outline.radiusTopRight(), outline.radiusBottomRight(), outline.radiusBottomLeft(),
-                    outline.outlineWidth(), outline.color()
+            case Render2DCommand.RoundRectOutline outline ->
+                    // TODO: RoundRectOutlineRenderer 当前仅支持单色；待渲染器支持渐变后改用4色重载
+                    renderers.roundRectOutlineRenderer().addOutline(
+                            outline.bounds().x(), outline.bounds().y(), outline.bounds().width(), outline.bounds().height(),
+                            outline.radiusTopLeft(), outline.radiusTopRight(), outline.radiusBottomRight(), outline.radiusBottomLeft(),
+                            outline.outlineWidth(), outline.topLeft()
+                    );
+            case Render2DCommand.Ellipse ellipse -> renderers.ellipseRenderer().addEllipseGradient(
+                    ellipse.bounds().x(), ellipse.bounds().y(), ellipse.bounds().width(), ellipse.bounds().height(),
+                    ellipse.topLeft(), ellipse.bottomLeft(), ellipse.bottomRight(), ellipse.topRight()
+            );
+            case Render2DCommand.Arc arc -> renderers.arcRenderer().addArcGradient(
+                    arc.bounds().x(), arc.bounds().y(), arc.bounds().width(), arc.bounds().height(),
+                    arc.startAngle(), arc.endAngle(), arc.innerRatio(),
+                    arc.topLeft(), arc.bottomLeft(), arc.bottomRight(), arc.topRight()
             );
             case Render2DCommand.Rect rect -> renderers.rectRenderer().addRectGradient(
                     rect.bounds().x(), rect.bounds().y(), rect.bounds().width(), rect.bounds().height(),
@@ -225,15 +241,18 @@ public final class Render2DScheduler implements AutoCloseable {
             case Render2DCommand.Triangle triangle -> renderers.triangleRenderer().addChevronTriangle(
                     triangle.centerX(), triangle.centerY(), triangle.size(), triangle.progress(), triangle.color()
             );
+            case Render2DCommand.FreeTriangle ft -> renderers.triangleRenderer().addTriangle(
+                    ft.x1(), ft.y1(), ft.x2(), ft.y2(), ft.x3(), ft.y3(), ft.color()
+            );
             case Render2DCommand.Texture texture -> {
                 if (texture.texture() instanceof Render2DTexture.IdentifierRef ref) {
                     if (texture.rotationDegrees() == 0.0f) {
-                        renderers.textureRenderer().addRoundedTexture(ref.identifier(),
+                        renderers.textureRenderer().addRoundedTexture(ref.ResourceLocation(),
                                 texture.bounds().x(), texture.bounds().y(), texture.bounds().width(), texture.bounds().height(),
                                 texture.radiusTopLeft(), texture.radiusTopRight(), texture.radiusBottomRight(), texture.radiusBottomLeft(),
                                 texture.u0(), texture.v0(), texture.u1(), texture.v1(), texture.color(), ref.linearFilter());
                     } else {
-                        renderers.textureRenderer().addRotatedTexture(ref.identifier(),
+                        renderers.textureRenderer().addRotatedTexture(ref.ResourceLocation(),
                                 texture.bounds().x(), texture.bounds().y(), texture.bounds().width(), texture.bounds().height(),
                                 texture.u0(), texture.v0(), texture.u1(), texture.v1(), texture.color(),
                                 texture.originX(), texture.originY(), texture.rotationDegrees(), ref.linearFilter());
@@ -253,7 +272,15 @@ public final class Render2DScheduler implements AutoCloseable {
                 }
             }
             case Render2DCommand.Text text -> {
-                if (text.fontLoader() != null) {
+                boolean gradient = text.colorEnd() != null;
+                if (gradient && text.rotationDegrees() == 0.0f) {
+                    // 渐变文字路径（仅支持非旋转）
+                    if (text.fontLoader() != null) {
+                        renderers.textRenderer().addGradientText(text.text(), text.x(), text.y(), text.scale(), text.color(), text.colorEnd(), text.fontLoader());
+                    } else {
+                        renderers.textRenderer().addGradientText(text.text(), text.x(), text.y(), text.scale(), text.color(), text.colorEnd());
+                    }
+                } else if (text.fontLoader() != null) {
                     if (text.rotationDegrees() == 0.0f) {
                         renderers.textRenderer().addText(text.text(), text.x(), text.y(), text.scale(), text.color(), text.fontLoader());
                     } else {
@@ -340,9 +367,120 @@ public final class Render2DScheduler implements AutoCloseable {
 
         public void addOutline(float x, float y, float width, float height, float topLeft, float topRight,
                                float bottomRight, float bottomLeft, float outlineWidth, Color color) {
+            addOutlineGradient(x, y, width, height, topLeft, topRight, bottomRight, bottomLeft,
+                    outlineWidth, color, color, color, color);
+        }
+
+        /** 四角独立颜色的渐变轮廓。颜色顺序：topLeft、bottomLeft、bottomRight、topRight。 */
+        public void addOutlineGradient(float x, float y, float width, float height, float radius, float outlineWidth,
+                                       Color topLeft, Color bottomLeft, Color bottomRight, Color topRight) {
+            addOutlineGradient(x, y, width, height, radius, radius, radius, radius,
+                    outlineWidth, topLeft, bottomLeft, bottomRight, topRight);
+        }
+
+        public void addOutlineGradient(float x, float y, float width, float height,
+                                       float radiusTopLeft, float radiusTopRight, float radiusBottomRight, float radiusBottomLeft,
+                                       float outlineWidth,
+                                       Color topLeft, Color bottomLeft, Color bottomRight, Color topRight) {
             scheduler.add(new Render2DCommand.RoundRectOutline(layer, scheduler.nextSequence(),
                     Render2DBounds.of(x, y, width, height), scissor,
-                    topLeft, topRight, bottomRight, bottomLeft, outlineWidth, color));
+                    radiusTopLeft, radiusTopRight, radiusBottomRight, radiusBottomLeft,
+                    outlineWidth, topLeft, bottomLeft, bottomRight, topRight));
+        }
+
+        // ─── Circle 便捷方法 ─────────────────────────────────────────────────
+        // 圆形等价于 RoundRect(w=h=2r, radius=r)。当 w=h 且 r=w/2 时，
+        // round_rectangle.fsh 的 SDF 会退化为 `length(p) - r`——即完美圆的 SDF。
+        // 因此复用 RoundRect 管线，零新增文件。
+
+        /** 以圆心 (centerX, centerY) 和半径 radius 绘制填充圆。 */
+        public void addCircle(float centerX, float centerY, float radius, Color color) {
+            addRoundRect(centerX - radius, centerY - radius, radius * 2.0f, radius * 2.0f, radius, color);
+        }
+
+        /**
+         * 以圆心和半径绘制径向渐变圆。
+         * 通过四角颜色映射实现视觉渐变：topLeft/bottomLeft/bottomRight/topRight 对应包围盒四角。
+         */
+        public void addCircleGradient(float centerX, float centerY, float radius,
+                                      Color topLeft, Color bottomLeft, Color bottomRight, Color topRight) {
+            addRoundRectGradient(centerX - radius, centerY - radius, radius * 2.0f, radius * 2.0f,
+                    radius, radius, radius, radius, topLeft, bottomLeft, bottomRight, topRight);
+        }
+
+        /** 以圆心、半径和描边宽度绘制圆环（描边圆）。 */
+        public void addCircleOutline(float centerX, float centerY, float radius, float outlineWidth, Color color) {
+            addOutline(centerX - radius, centerY - radius, radius * 2.0f, radius * 2.0f, radius, outlineWidth, color);
+        }
+
+        /** 四角颜色渐变的圆环。 */
+        public void addCircleOutlineGradient(float centerX, float centerY, float radius, float outlineWidth,
+                                             Color topLeft, Color bottomLeft, Color bottomRight, Color topRight) {
+            addOutlineGradient(centerX - radius, centerY - radius, radius * 2.0f, radius * 2.0f,
+                    radius, outlineWidth, topLeft, bottomLeft, bottomRight, topRight);
+        }
+
+        // ─── Ellipse 便捷方法 ────────────────────────────────────────────────
+        // 真椭圆走独立的 ELLIPSE 管线（椭圆 SDF），bounds 即椭圆包围盒，
+        // 半轴 a=width/2、b=height/2。当 width==height 时退化为完美圆，
+        // 与基于 RoundRect 的 addCircle 视觉一致但走不同管线。
+
+        /** 以包围盒 (x, y, width, height) 绘制填充椭圆。 */
+        public void addEllipse(float x, float y, float width, float height, Color color) {
+            addEllipseGradient(x, y, width, height, color, color, color, color);
+        }
+
+        /** 以圆心和两半轴绘制填充椭圆。 */
+        public void addEllipseCentered(float centerX, float centerY, float radiusX, float radiusY, Color color) {
+            addEllipse(centerX - radiusX, centerY - radiusY, radiusX * 2.0f, radiusY * 2.0f, color);
+        }
+
+        /** 四角颜色渐变椭圆。颜色顺序：topLeft、bottomLeft、bottomRight、topRight（对应包围盒四角）。 */
+        public void addEllipseGradient(float x, float y, float width, float height,
+                                       Color topLeft, Color bottomLeft, Color bottomRight, Color topRight) {
+            scheduler.add(new Render2DCommand.Ellipse(layer, scheduler.nextSequence(),
+                    Render2DBounds.of(x, y, width, height), scissor,
+                    topLeft, bottomLeft, bottomRight, topRight));
+        }
+
+        // ─── Arc / 扇形 / 环段 便捷方法 ──────────────────────────────────────
+        // 对外角度用度数（0°=+X 方向，逆时针为正，atan2 约定），内部转弧度传给着色器。
+        // innerRatio ∈ [0,1]：0 = 实心扇形(pie)，>0 = 环段（内半径 = 外半径 * innerRatio）。
+
+        /** 以圆心和半径绘制实心扇形（pie）。startDeg/endDeg 为度数。 */
+        public void addPie(float centerX, float centerY, float radius,
+                           float startDeg, float endDeg, Color color) {
+            addArc(centerX - radius, centerY - radius, radius * 2.0f, radius * 2.0f,
+                    startDeg, endDeg, 0.0f, color);
+        }
+
+        /** 以圆心、外半径和线宽绘制圆环段（弧线）。lineWidth 为环带宽度（像素）。 */
+        public void addRing(float centerX, float centerY, float radius, float lineWidth,
+                            float startDeg, float endDeg, Color color) {
+            float innerRatio = radius <= 0.0f ? 0.0f : Math.max(0.0f, (radius - lineWidth) / radius);
+            addArc(centerX - radius, centerY - radius, radius * 2.0f, radius * 2.0f,
+                    startDeg, endDeg, innerRatio, color);
+        }
+
+        /**
+         * 通用弧绘制。bounds 为外椭圆包围盒，startDeg/endDeg 为度数，
+         * innerRatio ∈ [0,1]（0=实心扇形，>0=环段）。
+         */
+        public void addArc(float x, float y, float width, float height,
+                           float startDeg, float endDeg, float innerRatio, Color color) {
+            addArcGradient(x, y, width, height, startDeg, endDeg, innerRatio, color, color, color, color);
+        }
+
+        /** 四角颜色渐变的弧。颜色顺序：topLeft、bottomLeft、bottomRight、topRight（对应包围盒四角）。 */
+        public void addArcGradient(float x, float y, float width, float height,
+                                   float startDeg, float endDeg, float innerRatio,
+                                   Color topLeft, Color bottomLeft, Color bottomRight, Color topRight) {
+            float startRad = (float) Math.toRadians(startDeg);
+            float endRad = (float) Math.toRadians(endDeg);
+            scheduler.add(new Render2DCommand.Arc(layer, scheduler.nextSequence(),
+                    Render2DBounds.of(x, y, width, height), scissor,
+                    startRad, endRad, innerRatio,
+                    topLeft, bottomLeft, bottomRight, topRight));
         }
 
         public void addRect(float x, float y, float width, float height, Color color) {
@@ -368,6 +506,17 @@ public final class Render2DScheduler implements AutoCloseable {
             scheduler.add(new Render2DCommand.Triangle(layer, scheduler.nextSequence(),
                     Render2DBounds.of(centerX - size, centerY - size, size * 2.0f, size * 2.0f), scissor,
                     centerX, centerY, size, progress, color));
+        }
+
+        /** 自由三角形：直接指定三顶点坐标，纯色填充。 */
+        public void addTriangle(float x1, float y1, float x2, float y2, float x3, float y3, Color color) {
+            float minX = Math.min(Math.min(x1, x2), x3);
+            float minY = Math.min(Math.min(y1, y2), y3);
+            float maxX = Math.max(Math.max(x1, x2), x3);
+            float maxY = Math.max(Math.max(y1, y2), y3);
+            scheduler.add(new Render2DCommand.FreeTriangle(layer, scheduler.nextSequence(),
+                    Render2DBounds.of(minX, minY, maxX - minX, maxY - minY), scissor,
+                    x1, y1, x2, y2, x3, y3, color));
         }
 
         public void addTexture(Render2DTexture texture, float x, float y, float width, float height,
@@ -400,22 +549,45 @@ public final class Render2DScheduler implements AutoCloseable {
         }
 
         public void addText(String text, float x, float y, float scale, Color color) {
-            addText(text, x, y, scale, color, null);
+            addTextInternal(text, x, y, scale, color, null, null, x, y, 0.0f);
         }
 
         public void addText(String text, float x, float y, float scale, Color color, TtfFontLoader fontLoader) {
-            addText(text, x, y, scale, color, fontLoader, x, y, 0.0f);
+            addTextInternal(text, x, y, scale, color, null, fontLoader, x, y, 0.0f);
         }
 
         public void addRotatedText(String text, float x, float y, float scale, Color color, float originX, float originY, float rotationDegrees) {
-            addText(text, x, y, scale, color, null, originX, originY, rotationDegrees);
+            addTextInternal(text, x, y, scale, color, null, null, originX, originY, rotationDegrees);
         }
 
         public void addRotatedText(String text, float x, float y, float scale, Color color, TtfFontLoader fontLoader, float originX, float originY, float rotationDegrees) {
-            addText(text, x, y, scale, color, fontLoader, originX, originY, rotationDegrees);
+            addTextInternal(text, x, y, scale, color, null, fontLoader, originX, originY, rotationDegrees);
         }
 
-        private void addText(String text, float x, float y, float scale, Color color, TtfFontLoader fontLoader, float originX, float originY, float rotationDegrees) {
+        /** 水平渐变文字，从 startColor 渐变到 endColor。仅支持非旋转文字。 */
+        public void addGradientText(String text, float x, float y, float scale, Color startColor, Color endColor) {
+            addTextInternal(text, x, y, scale, startColor, endColor, null, x, y, 0.0f);
+        }
+
+        public void addGradientText(String text, float x, float y, float scale, Color startColor, Color endColor, TtfFontLoader fontLoader) {
+            addTextInternal(text, x, y, scale, startColor, endColor, fontLoader, x, y, 0.0f);
+        }
+
+        /**
+         * 渲染玩家头像（皮肤纹理的头部区域 + 帽子层叠加）。
+         * texture 应指向64×64的皮肤纹理，可以是 {@link Render2DTexture.IdentifierRef} 或 {@link Render2DTexture.LuminRef}。
+         */
+        public void addPlayerHead(Render2DTexture texture, float x, float y, float size, float radius, Color color) {
+            // 基础头部层：u[8/64, 16/64] v[8/64, 16/64]
+            addRoundedTexture(texture, x, y, size, size, radius, radius, radius, radius,
+                    8f / 64f, 8f / 64f, 16f / 64f, 16f / 64f, color);
+            // 帽子层叠加：u[40/64, 48/64] v[8/64, 16/64]
+            addRoundedTexture(texture, x, y, size, size, radius, radius, radius, radius,
+                    40f / 64f, 8f / 64f, 48f / 64f, 16f / 64f, color);
+        }
+
+        private void addTextInternal(String text, float x, float y, float scale, Color color, Color colorEnd,
+                                     TtfFontLoader fontLoader, float originX, float originY, float rotationDegrees) {
             TextRenderer metrics = scheduler.textMetrics();
             float width = fontLoader != null ? metrics.getWidth(text, scale, fontLoader) : metrics.getWidth(text, scale);
             float height = fontLoader != null ? metrics.getHeight(scale, fontLoader) : metrics.getHeight(scale);
@@ -424,7 +596,7 @@ public final class Render2DScheduler implements AutoCloseable {
                     : rotatedBounds(x, y, width, height, originX, originY, rotationDegrees);
             scheduler.add(new Render2DCommand.Text(layer, scheduler.nextSequence(),
                     bounds, scissor,
-                    text, x, y, scale, color, fontLoader, originX, originY, rotationDegrees));
+                    text, x, y, scale, color, colorEnd, fontLoader, originX, originY, rotationDegrees));
         }
 
         private static Render2DBounds rotatedBounds(float x, float y, float width, float height, float originX, float originY, float rotationDegrees) {
@@ -885,6 +1057,8 @@ public final class Render2DScheduler implements AutoCloseable {
                 case SHADOW -> new RendererBundle(kind, ShadowRenderer.create());
                 case ROUND_RECT -> new RendererBundle(kind, RoundRectRenderer.create());
                 case ROUND_RECT_OUTLINE -> new RendererBundle(kind, RoundRectOutlineRenderer.create());
+                case ELLIPSE -> new RendererBundle(kind, EllipseRenderer.create());
+                case ARC -> new RendererBundle(kind, ArcRenderer.create());
                 case RECT -> new RendererBundle(kind, RectRenderer.create());
                 case TRIANGLE -> new RendererBundle(kind, TriangleRenderer.create());
                 case TEXTURE -> new RendererBundle(kind, TextureRenderer.create());
@@ -910,6 +1084,14 @@ public final class Render2DScheduler implements AutoCloseable {
 
         private RoundRectOutlineRenderer roundRectOutlineRenderer() {
             return (RoundRectOutlineRenderer) renderer;
+        }
+
+        private EllipseRenderer ellipseRenderer() {
+            return (EllipseRenderer) renderer;
+        }
+
+        private ArcRenderer arcRenderer() {
+            return (ArcRenderer) renderer;
         }
 
         private RectRenderer rectRenderer() {
@@ -941,6 +1123,10 @@ public final class Render2DScheduler implements AutoCloseable {
                         roundRect.setScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height());
                 case RoundRectOutlineRenderer outline ->
                         outline.setScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height());
+                case EllipseRenderer ellipse ->
+                        ellipse.setScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height());
+                case ArcRenderer arc ->
+                        arc.setScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height());
                 case RectRenderer rect -> rect.setScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height());
                 case TriangleRenderer triangle ->
                         triangle.setScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height());
@@ -957,6 +1143,8 @@ public final class Render2DScheduler implements AutoCloseable {
                 case ShadowRenderer shadow -> shadow.clearScissor();
                 case RoundRectRenderer roundRect -> roundRect.clearScissor();
                 case RoundRectOutlineRenderer outline -> outline.clearScissor();
+                case EllipseRenderer ellipse -> ellipse.clearScissor();
+                case ArcRenderer arc -> arc.clearScissor();
                 case RectRenderer rect -> rect.clearScissor();
                 case TriangleRenderer triangle -> triangle.clearScissor();
                 case TextureRenderer texture -> texture.clearScissor();

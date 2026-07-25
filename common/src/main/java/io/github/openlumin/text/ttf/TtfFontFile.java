@@ -1,7 +1,7 @@
 package io.github.openlumin.text.ttf;
 
-import net.minecraft.resources.Identifier;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
+import io.github.openlumin.utils.ResourceLocationUtils;
 import org.lwjgl.stb.STBTTFontinfo;
 import org.lwjgl.stb.STBTruetype;
 import org.lwjgl.system.MemoryStack;
@@ -23,7 +23,7 @@ public class TtfFontFile {
     public final int pixelAscent;
     public final int fontHeight;
 
-    public TtfFontFile(Identifier ttfFile, int totalHeight, int padding) {
+    public TtfFontFile(ResourceLocation ttfFile, int totalHeight, int padding) {
         this(ResourceLocationUtils.loadResource(ttfFile), totalHeight, padding, ttfFile.toString());
     }
 

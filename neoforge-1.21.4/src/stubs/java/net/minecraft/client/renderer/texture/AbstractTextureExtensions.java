@@ -3,6 +3,7 @@ package net.minecraft.client.renderer.texture;
 import com.mojang.blaze3d.platform.GpuTexture;
 import com.mojang.blaze3d.platform.GpuTextureView;
 import com.mojang.blaze3d.platform.GpuSampler;
+import net.minecraft.client.renderer.texture.AbstractTexture;
 
 /**
  * NeoForge适配层：扩展AbstractTexture以支持GPU纹理API

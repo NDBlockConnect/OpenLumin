@@ -1,8 +1,10 @@
 package io.github.openlumin.text;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import io.github.openlumin.text.ttf.TtfFontLoader;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.awt.*;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -13,24 +15,27 @@ import java.util.stream.Stream;
 
 public class StaticFontLoader {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(StaticFontLoader.class);
     private static final String[] FONT_FILE_EXTENSIONS = {".ttf", ".otf", ".ttc"};
     private static final String SIZE_REFERENCE_SAMPLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789简体中文字体设置默认自定义战斗移动玩家渲染";
-    private static final Identifier DEFAULT_FONT_ID = Identifier.of("openlumin", "fonts/font.ttf");
+    private static final ResourceLocation DEFAULT_FONT_ID = ResourceLocation.fromNamespaceAndPath("openlumin","fonts/font.ttf");
     private static TtfFontLoader builtinDefault = new TtfFontLoader(DEFAULT_FONT_ID);
     private static final float DEFAULT_VISUAL_HEIGHT = builtinDefault.fontFile.getVisualHeight(SIZE_REFERENCE_SAMPLE);
 
     public static volatile TtfFontLoader DEFAULT = builtinDefault;
 
-    public static final TtfFontLoader ICONS = new TtfFontLoader(Identifier.of("openlumin", "fonts/icons.ttf"));
+    public static final TtfFontLoader ICONS = new TtfFontLoader(ResourceLocation.fromNamespaceAndPath("openlumin","fonts/icons.ttf"));
 
-    public static final TtfFontLoader JURA_LIGHT = new TtfFontLoader(Identifier.of("openlumin", "fonts/jura-light.ttf"));
+    public static final TtfFontLoader JURA_LIGHT = new TtfFontLoader(ResourceLocation.fromNamespaceAndPath("openlumin","fonts/jura-light.ttf"));
 
-    public static final TtfFontLoader OSAKA_CHIPS = new TtfFontLoader(Identifier.of("openlumin", "fonts/osakachips.ttf"));
+    public static final TtfFontLoader OSAKA_CHIPS = new TtfFontLoader(ResourceLocation.fromNamespaceAndPath("openlumin","fonts/osakachips.ttf"));
 
     private static TtfFontLoader customDefault;
     private static Path customDefaultPath;
     private static boolean destroyed;
     private static volatile Map<String, Path> systemFontLookup;
+    private static Object appliedMode;
+    private static String appliedCustomFont;
 
     public static TtfFontLoader defaultFont() {
         return DEFAULT;
@@ -93,7 +98,7 @@ public class StaticFontLoader {
             next = new TtfFontLoader(path);
             next.setRenderScale(customRenderScale(next));
         } catch (RuntimeException e) {
-            Constants.LOGGER.warn("Failed to load custom default font: {}", path, e);
+            LOGGER.warn("Failed to load custom default font: {}", path, e);
             applyBuiltinDefault();
             return;
         }

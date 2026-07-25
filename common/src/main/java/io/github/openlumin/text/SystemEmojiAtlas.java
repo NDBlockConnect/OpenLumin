@@ -3,7 +3,8 @@ package io.github.openlumin.text;
 import io.github.openlumin.LuminTexture;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.*;
+import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import com.mojang.blaze3d.platform.*;
 
 import java.awt.*;
 import java.awt.font.FontRenderContext;
@@ -136,7 +137,7 @@ public final class SystemEmojiAtlas implements AutoCloseable {
     private void uploadAtlas() {
         try (NativeImage image = toNativeImage(atlasImage)) {
             if (texture == null) {
-                var device = RenderSystem.getDevice();
+                var device = RenderSystemExtensions.getDevice();
                 GpuTexture gpuTexture = device.createTexture(
                         "epsilon/system_emoji_atlas",
                         GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING,
@@ -147,10 +148,12 @@ public final class SystemEmojiAtlas implements AutoCloseable {
                         1
                 );
                 GpuTextureView view = device.createTextureView(gpuTexture);
-                GpuSampler sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR);
+                GpuSampler sampler = RenderSystemExtensions.getDevice().createSampler(
+                        AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
+                        FilterMode.LINEAR, FilterMode.LINEAR, 1, java.util.OptionalDouble.empty());
                 texture = new LuminTexture(gpuTexture, view, sampler, true, false);
             }
-            RenderSystem.getDevice().createCommandEncoder().writeToTexture(texture.getTexture(), image);
+            RenderSystemExtensions.getDevice().createCommandEncoder().writeToTexture(texture.getTexture(), image);
         }
     }
 

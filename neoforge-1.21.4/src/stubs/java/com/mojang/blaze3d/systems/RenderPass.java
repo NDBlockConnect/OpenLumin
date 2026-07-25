@@ -1,7 +1,8 @@
 package com.mojang.blaze3d.systems;
 
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.platform.GpuBuffer;
+import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.platform.GpuTextureView;
 import com.mojang.blaze3d.platform.GpuSampler;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
@@ -33,7 +34,17 @@ public class RenderPass implements AutoCloseable {
         // NeoForge使用不同的API
     }
 
+    /** platform.GpuBuffer 重载 */
+    public void setVertexBuffer(int slot, com.mojang.blaze3d.platform.GpuBuffer buffer) {
+        // NeoForge使用不同的API
+    }
+
     public void setIndexBuffer(GpuBuffer buffer, VertexFormat.IndexType indexType) {
+        // NeoForge使用不同的API
+    }
+
+    /** platform.GpuBuffer 重载 */
+    public void setIndexBuffer(com.mojang.blaze3d.platform.GpuBuffer buffer, VertexFormat.IndexType indexType) {
         // NeoForge使用不同的API
     }
 

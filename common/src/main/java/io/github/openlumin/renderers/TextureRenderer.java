@@ -12,10 +12,12 @@ import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.*;
+import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import com.mojang.blaze3d.platform.*;
 import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.client.renderer.texture.AbstractTextureExtensions;
 import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ARGB;
 import org.lwjgl.system.MemoryUtil;
 
@@ -64,19 +66,19 @@ public class TextureRenderer implements IRenderer {
         addRoundedTexture(texture, x, y, width, height, 0f, u0, v0, u1, v1, color);
     }
 
-    public void addQuadTexture(Identifier texture, float x, float y, float width, float height, float u0, float v0, float u1, float v1, Color color) {
+    public void addQuadTexture(ResourceLocation texture, float x, float y, float width, float height, float u0, float v0, float u1, float v1, Color color) {
         addRoundedTexture(texture, x, y, width, height, 0f, u0, v0, u1, v1, color, false);
     }
 
-    public void addQuadTexture(Identifier texture, float x, float y, float width, float height, float u0, float v0, float u1, float v1, Color color, boolean useLinearFilter) {
+    public void addQuadTexture(ResourceLocation texture, float x, float y, float width, float height, float u0, float v0, float u1, float v1, Color color, boolean useLinearFilter) {
         addRoundedTexture(texture, x, y, width, height, 0f, u0, v0, u1, v1, color, useLinearFilter);
     }
 
-    public void addRoundedTexture(Identifier texture, float x, float y, float width, float height, float radius, float u0, float v0, float u1, float v1, Color color) {
+    public void addRoundedTexture(ResourceLocation texture, float x, float y, float width, float height, float radius, float u0, float v0, float u1, float v1, Color color) {
         addRoundedTexture(texture, x, y, width, height, radius, u0, v0, u1, v1, color, false);
     }
 
-    public void addRoundedTexture(Identifier texture, float x, float y, float width, float height, float radius, float u0, float v0, float u1, float v1, Color color, boolean useLinearFilter) {
+    public void addRoundedTexture(ResourceLocation texture, float x, float y, float width, float height, float radius, float u0, float v0, float u1, float v1, Color color, boolean useLinearFilter) {
         addRoundedTexture((Object) texture, x, y, width, height, radius, radius, radius, radius, u0, v0, u1, v1, color, useLinearFilter);
     }
 
@@ -84,7 +86,7 @@ public class TextureRenderer implements IRenderer {
         addRoundedTexture(texture, x, y, width, height, radius, radius, radius, radius, u0, v0, u1, v1, color, true);
     }
 
-    public void addRoundedTexture(Identifier texture, float x, float y, float width, float height, float radiusTL, float radiusTR, float radiusBR, float radiusBL, float u0, float v0, float u1, float v1, Color color, boolean useLinearFilter) {
+    public void addRoundedTexture(ResourceLocation texture, float x, float y, float width, float height, float radiusTL, float radiusTR, float radiusBR, float radiusBL, float u0, float v0, float u1, float v1, Color color, boolean useLinearFilter) {
         addRoundedTexture((Object) texture, x, y, width, height, radiusTL, radiusTR, radiusBR, radiusBL, u0, v0, u1, v1, color, useLinearFilter);
     }
 
@@ -92,7 +94,7 @@ public class TextureRenderer implements IRenderer {
         addRoundedTexture(texture, x, y, width, height, radiusTL, radiusTR, radiusBR, radiusBL, u0, v0, u1, v1, color, true);
     }
 
-    public void addRotatedTexture(Identifier texture, float x, float y, float width, float height, float u0, float v0, float u1, float v1, Color color, float originX, float originY, float rotationDegrees, boolean useLinearFilter) {
+    public void addRotatedTexture(ResourceLocation texture, float x, float y, float width, float height, float u0, float v0, float u1, float v1, Color color, float originX, float originY, float rotationDegrees, boolean useLinearFilter) {
         addRotatedTexture((Object) texture, x, y, width, height, u0, v0, u1, v1, color, originX, originY, rotationDegrees, useLinearFilter);
     }
 
@@ -105,7 +107,7 @@ public class TextureRenderer implements IRenderer {
         addRoundedTexture(texture, x, y, size, size, radius, 40f / 64f, 8f / 64f, 48f / 64f, 16f / 64f, color);
     }
 
-    public void addPlayerHead(Identifier texture, float x, float y, float size, float radius, Color color) {
+    public void addPlayerHead(ResourceLocation texture, float x, float y, float size, float radius, Color color) {
         addRoundedTexture(texture, x, y, size, size, radius, 8f / 64f, 8f / 64f, 16f / 64f, 16f / 64f, color);
         addRoundedTexture(texture, x, y, size, size, radius, 40f / 64f, 8f / 64f, 48f / 64f, 16f / 64f, color);
     }
@@ -224,7 +226,7 @@ public class TextureRenderer implements IRenderer {
 
         GpuBufferSlice dynamicUniforms = LuminRenderSystem.writeDefaultGuiTransform();
         GpuBuffer ibo = LuminRenderSystem.getQuadIndexBuffer(maxIndexCount);
-        try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
+        try (RenderPass pass = RenderSystemExtensions.getDevice().createCommandEncoder().createRenderPass(
                 () -> "Rounded Texture Draws",
                 colorView, OptionalInt.empty(),
                 null, OptionalDouble.empty())
@@ -234,7 +236,7 @@ public class TextureRenderer implements IRenderer {
                 ScissorUtils.enableScissor(pass, scissorX, scissorY, scissorW, scissorH);
             }
 
-            RenderSystem.bindDefaultUniforms(pass);
+            // TODO: RenderSystem.bindDefaultUniforms not available in NeoForge 1.21.4
             pass.setUniform("DynamicTransforms", dynamicUniforms);
             pass.setIndexBuffer(ibo, LuminRenderSystem.getQuadIndexType());
 
@@ -285,7 +287,7 @@ public class TextureRenderer implements IRenderer {
     }
 
     private LuminTexture resolveTexture(Object textureKey, boolean useLinearFilter) {
-        if (textureKey instanceof Identifier id) {
+        if (textureKey instanceof ResourceLocation id) {
             return TextureCacheHolder.INSTANCE.textureCache.computeIfAbsent(
                     id, key -> loadTexture(key, useLinearFilter)
             );
@@ -318,12 +320,14 @@ public class TextureRenderer implements IRenderer {
         }
     }
 
-    private LuminTexture loadTexture(Identifier identifier, boolean useLinearFilter) {
-        AbstractTexture abstractTexture = Minecraft.getInstance().getTextureManager().getTexture(identifier);
+    private LuminTexture loadTexture(ResourceLocation ResourceLocation, boolean useLinearFilter) {
+        AbstractTexture abstractTexture = Minecraft.getInstance().getTextureManager().getTexture(ResourceLocation);
         try {
-            GpuTexture texture = abstractTexture.getTexture();
-            GpuTextureView view = abstractTexture.getTextureView();
-            GpuSampler sampler = abstractTexture.getSampler();
+            GpuTexture texture = AbstractTextureExtensions.getTexture(abstractTexture);
+            GpuTextureView view = AbstractTextureExtensions.getTextureView(abstractTexture);
+            GpuSampler sampler = RenderSystemExtensions.getDevice().createSampler(
+                    AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
+                    FilterMode.NEAREST, FilterMode.NEAREST, 1, OptionalDouble.empty());
             return new LuminTexture(texture, view, sampler, false, false);
         } catch (Exception ignored) {
         }
@@ -331,7 +335,7 @@ public class TextureRenderer implements IRenderer {
         NativeImage image;
         try {
             var manager = Minecraft.getInstance().getResourceManager();
-            var resource = manager.getResourceOrThrow(identifier);
+            var resource = manager.getResourceOrThrow(ResourceLocation);
             try (var stream = resource.open()) {
                 image = NativeImage.read(stream);
             }
@@ -339,13 +343,17 @@ public class TextureRenderer implements IRenderer {
             image = MissingTextureAtlasSprite.generateMissingImage();
         }
 
-        var device = RenderSystem.getDevice();
-        GpuTexture texture = device.createTexture(identifier.toString(), GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.RGBA8, image.getWidth(), image.getHeight(), 1, 1);
+        var device = RenderSystemExtensions.getDevice();
+        GpuTexture texture = device.createTexture(ResourceLocation.toString(), GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.RGBA8, image.getWidth(), image.getHeight(), 1, 1);
 
         device.createCommandEncoder().writeToTexture(texture, image);
 
         GpuTextureView view = device.createTextureView(texture);
-        GpuSampler sampler = RenderSystem.getSamplerCache().getClampToEdge(useLinearFilter ? FilterMode.LINEAR : FilterMode.NEAREST);
+        GpuSampler sampler = RenderSystemExtensions.getDevice().createSampler(
+                AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
+                useLinearFilter ? FilterMode.LINEAR : FilterMode.NEAREST,
+                useLinearFilter ? FilterMode.LINEAR : FilterMode.NEAREST,
+                1, OptionalDouble.empty());
 
         image.close();
 

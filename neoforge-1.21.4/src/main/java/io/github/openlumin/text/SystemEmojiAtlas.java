@@ -3,7 +3,12 @@ package io.github.openlumin.text;
 import io.github.openlumin.LuminTexture;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.platform.*;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuTexture;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuTextureView;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuSampler;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuDevice;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.TextureFormat;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.FilterMode;
 
 import java.awt.*;
 import java.awt.font.FontRenderContext;

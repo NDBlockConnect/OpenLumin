@@ -2,7 +2,7 @@ package io.github.openlumin.utils.render;
 
 import io.github.openlumin.LuminRenderSystem;
 import com.mojang.blaze3d.platform.Window;
-import com.mojang.blaze3d.systems.RenderPass;
+import io.github.openlumin.shim.com.mojang.blaze3d.systems.RenderPass;
 import net.minecraft.client.Minecraft;
 
 public class ScissorUtils {

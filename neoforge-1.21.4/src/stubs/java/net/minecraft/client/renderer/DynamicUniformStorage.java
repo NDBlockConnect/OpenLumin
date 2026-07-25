@@ -2,6 +2,9 @@ package net.minecraft.client.renderer;
 
 import com.mojang.blaze3d.platform.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import org.joml.Matrix4fc;
+import org.joml.Vector4fc;
+import org.joml.Vector3fc;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryUtil;
@@ -53,6 +56,14 @@ public class DynamicUniformStorage<T extends DynamicUniformStorage.DynamicUnifor
 
     public GpuBufferSlice writeUniform(T uniform) {
         return write(uniform);
+    }
+
+    /**
+     * Fabric API适配：写入变换矩阵数据（modelView + colorModulator + modelOffset + textureMatrix）
+     */
+    public GpuBufferSlice writeTransform(Matrix4fc modelView, Vector4fc colorModulator, Vector3fc modelOffset, Matrix4fc textureMatrix) {
+        // NeoForge使用不同的API，返回占位slice
+        return new GpuBufferSlice(buffer, writeOffset, uniformSize);
     }
 
     public void endFrame() {

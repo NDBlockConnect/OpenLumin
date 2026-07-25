@@ -1,7 +1,7 @@
 package io.github.openlumin.text;
 
 import io.github.openlumin.text.ttf.TtfFontLoader;
-import com.mojang.blaze3d.systems.RenderPass;
+import io.github.openlumin.shim.com.mojang.blaze3d.systems.RenderPass;
 
 import java.awt.*;
 

@@ -3,12 +3,13 @@ package io.github.openlumin.text.ttf;
 import io.github.openlumin.LuminTexture;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.AddressMode;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.TextureFormat;
+import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import com.mojang.blaze3d.platform.AddressMode;
+import com.mojang.blaze3d.platform.FilterMode;
+import com.mojang.blaze3d.platform.GpuTexture;
+import com.mojang.blaze3d.platform.TextureFormat;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -21,16 +22,16 @@ public class TtfGlyphAtlas {
     private static final int GLYPH_GUTTER = 2;
     private static final AtomicInteger NEXT_TEXTURE_ID = new AtomicInteger();
     private final LuminTexture texture;
-    private final Identifier textureId;
+    private final ResourceLocation textureId;
 
     private int currentX = 0;
     private int currentY = 0;
     private int currentRowHeight = 0;
 
     public TtfGlyphAtlas(int atlasId) {
-        this.textureId = Identifier.fromNamespaceAndPath("epsilon", "ttf_atlas/" + NEXT_TEXTURE_ID.getAndIncrement());
+        this.textureId = ResourceLocation.fromNamespaceAndPath("epsilon", "ttf_atlas/" + NEXT_TEXTURE_ID.getAndIncrement());
 
-        final var texture = RenderSystem.getDevice().createTexture(
+        final var texture = RenderSystemExtensions.getDevice().createTexture(
                 () -> "Lumin-TtfGlyphAtlas",
                 GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_COPY_DST,
                 TextureFormat.RED8,
@@ -38,8 +39,8 @@ public class TtfGlyphAtlas {
                 1, 1
         );
 
-        final var textureView = RenderSystem.getDevice().createTextureView(texture);
-        final var sampler = RenderSystem.getDevice().createSampler(
+        final var textureView = RenderSystemExtensions.getDevice().createTextureView(texture);
+        final var sampler = RenderSystemExtensions.getDevice().createSampler(
                 AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
                 FilterMode.LINEAR, FilterMode.LINEAR,
                 1, OptionalDouble.empty()
@@ -54,7 +55,7 @@ public class TtfGlyphAtlas {
         ByteBuffer transparent = MemoryUtil.memAlloc(SIZE * SIZE);
         try {
             MemoryUtil.memSet(MemoryUtil.memAddress(transparent), 0xFF, SIZE * SIZE);
-            RenderSystem.getDevice().createCommandEncoder().writeToTexture(
+            RenderSystemExtensions.getDevice().createCommandEncoder().writeToTexture(
                     texture,
                     transparent,
                     NativeImage.Format.LUMINANCE,
@@ -94,7 +95,7 @@ public class TtfGlyphAtlas {
         int glyphX = currentX + GLYPH_GUTTER;
         int glyphY = currentY + GLYPH_GUTTER;
 
-        RenderSystem.getDevice().createCommandEncoder().writeToTexture(
+        RenderSystemExtensions.getDevice().createCommandEncoder().writeToTexture(
                 this.texture.getTexture(),
                 glyph.glyphData(),
                 NativeImage.Format.LUMINANCE,
@@ -126,7 +127,7 @@ public class TtfGlyphAtlas {
         return SIZE;
     }
 
-    public Identifier getTextureId() {
+    public ResourceLocation getTextureId() {
         return textureId;
     }
 

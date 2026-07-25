@@ -2,11 +2,11 @@ package io.github.openlumin.shaders;
 
 import net.minecraft.resources.ResourceLocation;
 import io.github.openlumin.LuminRenderSystem;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.buffers.Std140Builder;
-import com.mojang.blaze3d.buffers.Std140SizeCalculator;
+import io.github.openlumin.shim.com.mojang.blaze3d.buffers.GpuBufferSlice;
+import io.github.openlumin.shim.com.mojang.blaze3d.buffers.Std140Builder;
+import io.github.openlumin.shim.com.mojang.blaze3d.buffers.Std140SizeCalculator;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import net.minecraft.client.renderer.DynamicUniformStorage;
+import io.github.openlumin.impl.DynamicUniformStorage;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL20;

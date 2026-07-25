@@ -3,7 +3,6 @@ package io.github.openlumin.utils.render;
 import io.github.openlumin.LuminRenderSystem;
 import com.mojang.blaze3d.systems.RenderPass;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.state.WindowRenderState;
 
 public class ScissorUtils {
 
@@ -77,8 +76,7 @@ public class ScissorUtils {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        WindowRenderState windowState = mc.gameRenderer.getGameRenderState().windowRenderState;
-        return windowState.width;
+        return mc.getWindow().getWidth();
     }
 
     private static int getFramebufferHeight() {
@@ -88,7 +86,6 @@ public class ScissorUtils {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        WindowRenderState windowState = mc.gameRenderer.getGameRenderState().windowRenderState;
-        return windowState.height;
+        return mc.getWindow().getHeight();
     }
 }

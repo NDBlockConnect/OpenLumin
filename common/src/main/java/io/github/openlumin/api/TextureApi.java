@@ -18,11 +18,30 @@ public interface TextureApi {
     TextureHandle createTexture(int width, int height, TextureFormat format);
 
     /**
-     * 上传像素数据到纹理
+     * 上传像素数据到纹理（全量覆盖，从原点开始）。
+     *
      * @param handle 纹理句柄
-     * @param pixels 像素数据（格式需与创建时指定的格式匹配）
+     * @param width  纹理宽度（像素）
+     * @param height 纹理高度（像素）
+     * @param pixels 像素数据（格式需与创建时指定的 TextureFormat 匹配）
      */
-    void uploadTexture(TextureHandle handle, ByteBuffer pixels);
+    void uploadTexture(TextureHandle handle, int width, int height, ByteBuffer pixels);
+
+    /**
+     * 上传像素数据到纹理的指定子区域（部分更新）。
+     *
+     * @param handle  纹理句柄
+     * @param offsetX 目标 X 偏移（像素）
+     * @param offsetY 目标 Y 偏移（像素）
+     * @param width   区域宽度
+     * @param height  区域高度
+     * @param pixels  像素数据
+     */
+    default void uploadTextureSub(TextureHandle handle, int offsetX, int offsetY,
+                                  int width, int height, ByteBuffer pixels) {
+        // 默认委托全量上传；实现类可覆盖以支持 glTexSubImage2D 偏移。
+        uploadTexture(handle, width, height, pixels);
+    }
 
     /**
      * 绑定纹理到纹理单元

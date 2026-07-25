@@ -6,8 +6,8 @@ import io.github.openlumin.buffer.LuminRingBuffer;
 import io.github.openlumin.holders.RendererHolder;
 import io.github.openlumin.shaders.ShaderProgram;
 import io.github.openlumin.utils.render.ScissorUtils;
-import com.mojang.blaze3d.platform.GpuBuffer;
-import com.mojang.blaze3d.systems.RenderPass;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuBuffer;
+import io.github.openlumin.shim.com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
@@ -136,6 +136,22 @@ public class RoundRectRenderer implements IRenderer {
     private void drawWithOpenGL(LuminRenderSystem.QuadRenderingInfo info) {
         ShaderProgram shader = getRoundRectShader();
         shader.use();
+
+        // 上传 ProjMat uniform（正交投影矩阵）
+        int projLoc = shader.getUniformLocation("ProjMat");
+        if (projLoc >= 0) {
+            float[] projArr = new float[16];
+            RenderSystem.getProjectionMatrix().get(projArr);
+            GL20.glUniformMatrix4fv(projLoc, false, projArr);
+        }
+
+        // 上传 ModelViewMat uniform（模型视图矩阵）
+        int mvLoc = shader.getUniformLocation("ModelViewMat");
+        if (mvLoc >= 0) {
+            float[] mvArr = new float[16];
+            RenderSystem.getModelViewMatrix().get(mvArr);
+            GL20.glUniformMatrix4fv(mvLoc, false, mvArr);
+        }
 
         // 启用混合模式
         GL11.glEnable(GL11.GL_BLEND);

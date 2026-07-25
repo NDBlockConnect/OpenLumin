@@ -1,6 +1,6 @@
 package io.github.openlumin.shaders;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import io.github.openlumin.LuminRenderSystem;
 import io.github.openlumin.utils.render.ScissorUtils;
 import com.mojang.blaze3d.buffers.GpuBuffer;
@@ -13,14 +13,15 @@ import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import com.mojang.blaze3d.platform.AddressMode;
+import com.mojang.blaze3d.platform.FilterMode;
+import com.mojang.blaze3d.platform.GpuTexture;
+import com.mojang.blaze3d.platform.GpuTextureView;
 import com.mojang.blaze3d.vertex.*;
-import net.minecraft.client.renderer.DynamicUniformStorage;
+import io.github.openlumin.impl.DynamicUniformStorage;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.rendertype.TextureTransform;
-import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
@@ -37,8 +38,8 @@ public class BlurShader {
 
     public static final BlurShader INSTANCE = new BlurShader();
 
-    private static final Identifier BLUR_PATH = Identifier.of("openlumin", "blur");
-    private static final Identifier BLUR_3D_BOX_PATH = Identifier.of("openlumin", "blur_3d_box");
+    private static final ResourceLocation BLUR_PATH = ResourceLocation.fromNamespaceAndPath("openlumin","blur");
+    private static final ResourceLocation BLUR_3D_BOX_PATH = ResourceLocation.fromNamespaceAndPath("openlumin","blur_3d_box");
 
     private static final int UNIFORMS_SIZE = new Std140SizeCalculator()
             .putVec3()
@@ -57,7 +58,7 @@ public class BlurShader {
     private void ensureProgram() {
         if (this.pipeline == null) {
             this.pipeline = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
-                    .withLocation(Identifier.of("openlumin", "pipeline/blur"))
+                    .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin","pipeline/blur"))
                     .withVertexShader(BLUR_PATH)
                     .withFragmentShader(BLUR_PATH)
                     .withUniform("BlurUniforms", UniformType.UNIFORM_BUFFER)
@@ -71,7 +72,7 @@ public class BlurShader {
     private void ensureBoxProgram() {
         if (this.boxPipeline == null) {
             this.boxPipeline = RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
-                    .withLocation(Identifier.of("openlumin", "pipeline/blur_3d_box"))
+                    .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin","pipeline/blur_3d_box"))
                     .withVertexShader(BLUR_3D_BOX_PATH)
                     .withFragmentShader(BLUR_3D_BOX_PATH)
                     .withUniform("BoxBlurUniforms", UniformType.UNIFORM_BUFFER)
@@ -133,7 +134,7 @@ public class BlurShader {
 
         float quality = Math.max(0.0f, blurStrength);
 
-        CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
+        CommandEncoder encoder = RenderSystemExtensions.getDevice().createCommandEncoder();
         encoder.copyTextureToTexture(
                 targetTexture,
                 input.getColorTexture(),
@@ -156,9 +157,12 @@ public class BlurShader {
         )) {
             renderPass.setPipeline(pipeline);
             ScissorUtils.enableScissor(renderPass, scissor);
-            RenderSystem.bindDefaultUniforms(renderPass);
+            // TODO: RenderSystem.bindDefaultUniforms not available in NeoForge 1.21.4
             renderPass.setUniform("BlurUniforms", blurUniforms);
-            renderPass.bindTexture("InputSampler", input.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+            renderPass.bindTexture("InputSampler", input.getColorTextureView(),
+                    RenderSystemExtensions.getDevice().createSampler(
+                            AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
+                            FilterMode.LINEAR, FilterMode.LINEAR, 1, OptionalDouble.empty()));
             renderPass.draw(0, 3);
         }
     }
@@ -191,7 +195,7 @@ public class BlurShader {
             return;
         }
 
-        CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
+        CommandEncoder encoder = RenderSystemExtensions.getDevice().createCommandEncoder();
         encoder.copyTextureToTexture(
                 fb.getColorTexture(),
                 input.getColorTexture(),
@@ -212,8 +216,9 @@ public class BlurShader {
         addBoxVertices(buffer, box);
         MeshData mesh = buffer.buildOrThrow();
 
-        GpuBuffer vertices = this.boxPipeline.getVertexFormat().uploadImmediateVertexBuffer(mesh.vertexBuffer());
-        RenderSystem.AutoStorageIndexBuffer autoIndices = RenderSystem.getSequentialBuffer(mesh.drawState().mode());
+        GpuBuffer vertices = new GpuBuffer(() -> "BlurShader vertices", GpuBuffer.USAGE_VERTEX, mesh.vertexBuffer().remaining());
+        com.mojang.blaze3d.systems.AutoStorageIndexBuffer autoIndices =
+                new com.mojang.blaze3d.systems.AutoStorageIndexBuffer(mesh.drawState().mode());
         GpuBuffer indices = autoIndices.getBuffer(mesh.drawState().indexCount());
         VertexFormat.IndexType indexType = autoIndices.type();
         GpuBufferSlice dynamicTransforms = LuminRenderSystem.writeTransform(
@@ -229,10 +234,13 @@ public class BlurShader {
                 fb.useDepth ? fb.getDepthTextureView() : null, OptionalDouble.empty()
         )) {
             renderPass.setPipeline(this.boxPipeline);
-            RenderSystem.bindDefaultUniforms(renderPass);
+            // TODO: RenderSystem.bindDefaultUniforms not available in NeoForge 1.21.4
             renderPass.setUniform("DynamicTransforms", dynamicTransforms);
             renderPass.setUniform("BoxBlurUniforms", boxBlurUniforms);
-            renderPass.bindTexture("InputSampler", input.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+            renderPass.bindTexture("InputSampler", input.getColorTextureView(),
+                    RenderSystemExtensions.getDevice().createSampler(
+                            AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
+                            FilterMode.LINEAR, FilterMode.LINEAR, 1, OptionalDouble.empty()));
             renderPass.setVertexBuffer(0, vertices);
             renderPass.setIndexBuffer(indices, indexType);
             renderPass.drawIndexed(0, 0, mesh.drawState().indexCount(), 1);
@@ -242,7 +250,7 @@ public class BlurShader {
     }
 
     private void addBoxVertices(BufferBuilder buffer, AABB box) {
-        Vec3 camPos = Minecraft.getInstance().getEntityRenderDispatcher().camera.position();
+        Vec3 camPos = Minecraft.getInstance().getEntityRenderDispatcher().camera.getPosition();
 
         float minX = (float) (box.minX - camPos.x);
         float minY = (float) (box.minY - camPos.y);
@@ -251,7 +259,7 @@ public class BlurShader {
         float maxY = (float) (box.maxY - camPos.y);
         float maxZ = (float) (box.maxZ - camPos.z);
 
-        Matrix4f matrix = Minecraft.getInstance().gameRenderer.getGameRenderState().levelRenderState.cameraRenderState.viewRotationMatrix;
+        Matrix4f matrix = RenderSystem.getModelViewMatrix();
 
         vertex(buffer, matrix, minX, minY, minZ);
         vertex(buffer, matrix, minX, minY, maxZ);

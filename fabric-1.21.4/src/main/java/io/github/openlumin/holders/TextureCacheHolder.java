@@ -1,7 +1,7 @@
 package io.github.openlumin.holders;
 
 import io.github.openlumin.LuminTexture;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -17,9 +17,9 @@ public class TextureCacheHolder {
     }
 
     // 使用 LinkedHashMap 实现 LRU 缓存，访问顺序模式
-    public final Map<Identifier, LuminTexture> textureCache = new LinkedHashMap<>(16, 0.75f, true) {
+    public final Map<ResourceLocation, LuminTexture> textureCache = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
-        protected boolean removeEldestEntry(Map.Entry<Identifier, LuminTexture> eldest) {
+        protected boolean removeEldestEntry(Map.Entry<ResourceLocation, LuminTexture> eldest) {
             if (size() > MAX_CACHE_SIZE) {
                 // 关闭被淘汰的纹理，释放 GPU 资源
                 eldest.getValue().close();

@@ -1,85 +1,86 @@
 package io.github.openlumin;
 
 import net.minecraft.resources.ResourceLocation;
-import com.mojang.blaze3d.pipeline.BlendFunction;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.minecraft.client.renderer.RenderPipelines;
 
-
+/**
+ * OpenLumin 渲染管线常量表。
+ *
+ * <p>全部使用 {@link LuminPipeline} 而非 MC 的 RenderPipeline，
+ * 因为 MC 1.21.4 运行时不含 RenderPipeline 类，直接引用会导致
+ * {@code <clinit>} 阶段 {@link NoClassDefFoundError}。</p>
+ */
 public class LuminRenderPipelines {
 
-    private final static RenderPipeline.Snippet NO_BLEND_DEPTH_SNIPPET = RenderPipeline.builder(RenderPipelines.MATRICES_PROJECTION_SNIPPET)
-            .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
-            .buildSnippet();
-
-    public final static RenderPipeline RECTANGLE = RenderPipeline.builder(NO_BLEND_DEPTH_SNIPPET)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/rectangle"))
+    public static final LuminPipeline RECTANGLE = LuminPipeline
+            .builder(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/rectangle"))
             .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
             .withVertexShader(ResourceLocation.fromNamespaceAndPath("openlumin", "rectangle"))
             .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin", "rectangle"))
-            .withCull(false)
             .build();
 
-    public final static RenderPipeline TTF_FONT_AA = RenderPipeline.builder(NO_BLEND_DEPTH_SNIPPET)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/ttf_font_aa"))
+    public static final LuminPipeline TTF_FONT_AA = LuminPipeline
+            .builder(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/ttf_font_aa"))
             .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
             .withVertexShader(ResourceLocation.fromNamespaceAndPath("openlumin", "ttf_font"))
             .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin", "ttf_font_aa"))
-            .withSampler("Sampler0")
-            .withCull(false)
             .build();
 
-    public final static RenderPipeline TTF_FONT_NO_AA = RenderPipeline.builder(NO_BLEND_DEPTH_SNIPPET)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/ttf_font_no_aa"))
+    public static final LuminPipeline TTF_FONT_NO_AA = LuminPipeline
+            .builder(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/ttf_font_no_aa"))
             .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
             .withVertexShader(ResourceLocation.fromNamespaceAndPath("openlumin", "ttf_font"))
             .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin", "ttf_font_no_aa"))
-            .withSampler("Sampler0")
-            .withCull(false)
             .build();
 
-    public final static RenderPipeline ROUND_RECT = RenderPipeline.builder(NO_BLEND_DEPTH_SNIPPET)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/round_rectangle"))
+    public static final LuminPipeline ROUND_RECT = LuminPipeline
+            .builder(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/round_rectangle"))
             .withVertexFormat(LuminVertexFormats.ROUND_RECT, VertexFormat.Mode.QUADS)
             .withVertexShader(ResourceLocation.fromNamespaceAndPath("openlumin", "round_rectangle"))
             .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin", "round_rectangle"))
-            .withCull(false)
             .build();
 
-    public final static RenderPipeline ROUND_RECT_OUTLINE = RenderPipeline.builder(NO_BLEND_DEPTH_SNIPPET)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/round_rectangle_outline"))
+    public static final LuminPipeline ROUND_RECT_OUTLINE = LuminPipeline
+            .builder(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/round_rectangle_outline"))
             .withVertexFormat(LuminVertexFormats.ROUND_RECT_OUTLINE, VertexFormat.Mode.QUADS)
             .withVertexShader(ResourceLocation.fromNamespaceAndPath("openlumin", "round_rectangle_outline"))
             .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin", "round_rectangle_outline"))
-            .withCull(false)
             .build();
 
-    public final static RenderPipeline SHADOW = RenderPipeline.builder(NO_BLEND_DEPTH_SNIPPET)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/shadow"))
+    public static final LuminPipeline ELLIPSE = LuminPipeline
+            .builder(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/ellipse"))
+            .withVertexFormat(LuminVertexFormats.ROUND_RECT, VertexFormat.Mode.QUADS)
+            .withVertexShader(ResourceLocation.fromNamespaceAndPath("openlumin", "ellipse"))
+            .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin", "ellipse"))
+            .build();
+
+    public static final LuminPipeline ARC = LuminPipeline
+            .builder(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/arc"))
+            .withVertexFormat(LuminVertexFormats.ROUND_RECT, VertexFormat.Mode.QUADS)
+            .withVertexShader(ResourceLocation.fromNamespaceAndPath("openlumin", "arc"))
+            .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin", "arc"))
+            .build();
+
+    public static final LuminPipeline SHADOW = LuminPipeline
+            .builder(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/shadow"))
             .withVertexFormat(LuminVertexFormats.ROUND_RECT, VertexFormat.Mode.QUADS)
             .withVertexShader(ResourceLocation.fromNamespaceAndPath("openlumin", "shadow"))
             .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin", "shadow"))
-            .withCull(false)
             .build();
 
-    public final static RenderPipeline TEXTURE = RenderPipeline.builder(NO_BLEND_DEPTH_SNIPPET)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/texture"))
+    public static final LuminPipeline TEXTURE = LuminPipeline
+            .builder(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/texture"))
             .withVertexFormat(LuminVertexFormats.TEXTURE, VertexFormat.Mode.QUADS)
             .withVertexShader(ResourceLocation.fromNamespaceAndPath("openlumin", "texture"))
             .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin", "texture"))
-            .withSampler("Sampler0")
-            .withCull(false)
             .build();
 
-    public final static RenderPipeline TRIANGLE = RenderPipeline.builder(NO_BLEND_DEPTH_SNIPPET)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/triangle"))
+    public static final LuminPipeline TRIANGLE = LuminPipeline
+            .builder(ResourceLocation.fromNamespaceAndPath("openlumin", "pipelines/triangle"))
             .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.TRIANGLES)
             .withVertexShader(ResourceLocation.fromNamespaceAndPath("openlumin", "triangle"))
             .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin", "triangle"))
-            .withCull(false)
             .build();
 
 }

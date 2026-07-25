@@ -1,6 +1,6 @@
 package io.github.openlumin.renderers;
 
-import com.mojang.blaze3d.systems.RenderPass;
+import io.github.openlumin.shim.com.mojang.blaze3d.systems.RenderPass;
 
 public interface IRenderer {
 

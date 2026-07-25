@@ -1,5 +1,5 @@
 plugins {
-    id("net.neoforged.gradle.userdev") version "7.0.163"
+    id("net.neoforged.gradle.userdev") version "7.0.179"
 }
 
 configurations.all {
@@ -11,23 +11,19 @@ configurations.all {
     }
 }
 
-// stubs sourceSet: 仅编译时使用，不进入运行时模块路径，避免 JPMS 包冲突
+// 注意：stubs sourceSet 仅用于 common 模块编译（common 在 build.gradle.kts 里引用 stubs.output）。
+// neoforge-1.21.4/main 里所有 openlumin 源已经改用 io.github.openlumin.shim.<原FQN>，
+// 不再需要 stubs 参与 main 编译。放弃 stubs 后不会有 JPMS 拆包冲突。
 val stubs by sourceSets.creating {
     java.srcDirs("src/stubs/java")
     compileClasspath += sourceSets.main.get().compileClasspath
-}
-
-// main sourceSet 编译时，stubs 必须排在 NeoForge 之前，
-// 确保我们的适配类（BakedGlyph interface、RenderTarget 扩展方法等）优先生效
-sourceSets.main.get().apply {
-    compileClasspath = stubs.output + compileClasspath
 }
 
 dependencies {
     implementation(project(":common"))
 
     // NeoForge & Minecraft
-    implementation("net.neoforged:neoforge:21.4.27-beta")
+    implementation("net.neoforged:neoforge:21.4.157")
 
     // Annotations
     compileOnly("com.google.code.findbugs:jsr305:3.0.2")
@@ -40,10 +36,19 @@ tasks {
     named("classes") {
         dependsOn(project(":common").tasks.named("classes"))
         doLast {
+            // 注意：DuplicatesStrategy.EXCLUDE 只防止多个 from() 之间的重复，
+            // 不保护目标目录中已存在的文件。必须用 eachFile 手动跳过已存在的文件，
+            // 否则 common 的类（如 LuminRenderSystem）会覆盖平台专属版本。
+            val destDir = sourceSets.main.get().output.classesDirs.singleFile
             copy {
                 from(project(":common").sourceSets.main.get().output.classesDirs)
-                into(sourceSets.main.get().output.classesDirs.singleFile)
-                duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+                into(destDir)
+                eachFile {
+                    if (File(destDir, this.relativePath.pathString).exists()) {
+                        this.exclude()
+                    }
+                }
+                includeEmptyDirs = false
             }
         }
     }

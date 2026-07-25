@@ -8,15 +8,13 @@ import com.mojang.blaze3d.ProjectionType;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.*;
+import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import com.mojang.blaze3d.platform.*;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.renderer.DynamicUniformStorage;
-import net.minecraft.client.renderer.Projection;
-import net.minecraft.client.renderer.ProjectionMatrixBuffer;
-import net.minecraft.client.renderer.rendertype.TextureTransform;
+import io.github.openlumin.impl.DynamicUniformStorage;
 import net.minecraft.client.renderer.state.WindowRenderState;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import org.joml.*;
 
 import javax.annotation.Nullable;
@@ -29,10 +27,6 @@ import net.minecraft.client.Minecraft;
 
 public class LuminRenderSystem {
 
-    public static final Projection guiOrthoProjection = new Projection();
-
-    private static final ProjectionMatrixBuffer guiProjectionMatrixBuffer = new ProjectionMatrixBuffer("lumin-gui");
-
     @Nullable
     private static LuminRenderTarget activeTarget = null;
     private static long renderFrameId;
@@ -42,7 +36,6 @@ public class LuminRenderSystem {
     }
 
     public static void destroyAll() {
-        guiProjectionMatrixBuffer.close();
         ShaderUniforms.closeAll();
         RenderTargetHolder.INSTANCE.destroyAll();
         RendererHolder.INSTANCE.destroyAll();
@@ -77,18 +70,15 @@ public class LuminRenderSystem {
     }
 
     public static double getGuiScale() {
-        WindowRenderState windowState = Minecraft.getInstance().gameRenderer.getGameRenderState().windowRenderState;
-        return windowState.guiScale;
+        return Minecraft.getInstance().getWindow().getGuiScale();
     }
 
     public static float getScaledWidth() {
-        WindowRenderState windowState = Minecraft.getInstance().gameRenderer.getGameRenderState().windowRenderState;
-        return (float) (windowState.width / getGuiScale());
+        return (float) (Minecraft.getInstance().getWindow().getWidth() / getGuiScale());
     }
 
     public static float getScaledHeight() {
-        WindowRenderState windowState = Minecraft.getInstance().gameRenderer.getGameRenderState().windowRenderState;
-        return (float) (windowState.height / getGuiScale());
+        return (float) (Minecraft.getInstance().getWindow().getHeight() / getGuiScale());
     }
 
     public static int getScaledWidthInt() {
@@ -144,14 +134,11 @@ public class LuminRenderSystem {
     }
 
     public static void applyOrthoProjection() {
-        guiOrthoProjection
-                .setupOrtho(-1000.0F, 1000.0F,
-                        getScaledWidth(),
-                        getScaledHeight(),
-                        true
-                );
-        RenderSystem.setProjectionMatrix(
-                guiProjectionMatrixBuffer.getBuffer(guiOrthoProjection), ProjectionType.ORTHOGRAPHIC);
+        float w = getScaledWidth();
+        float h = getScaledHeight();
+        // 正交投影：(0,0) 左上，(w,h) 右下，Z 范围 [-1000, 1000]
+        org.joml.Matrix4f proj = new org.joml.Matrix4f().setOrtho(0f, w, h, 0f, -1000f, 1000f);
+        RenderSystem.setProjectionMatrix(proj, ProjectionType.ORTHOGRAPHIC);
     }
 
     /**
@@ -189,26 +176,26 @@ public class LuminRenderSystem {
                 RenderSystem.getModelViewMatrix(),
                 new Vector4f(1, 1, 1, 1),
                 new Vector3f(0, 0, 0),
-                TextureTransform.DEFAULT_TEXTURING.getMatrix()
+                new org.joml.Matrix4f()
         );
 
         return new QuadRenderingInfo(colorView, depthView, getQuadIndexType(), ibo, indexCount, dynamicUniforms);
     }
 
     public static GpuBuffer getQuadIndexBuffer(int indexCount) {
-        RenderSystem.AutoStorageIndexBuffer autoIndices =
-                RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+        com.mojang.blaze3d.systems.AutoStorageIndexBuffer autoIndices =
+                new com.mojang.blaze3d.systems.AutoStorageIndexBuffer(VertexFormat.Mode.QUADS);
         return autoIndices.getBuffer(indexCount);
     }
 
     public static VertexFormat.IndexType getQuadIndexType() {
-        RenderSystem.AutoStorageIndexBuffer autoIndices =
-                RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+        com.mojang.blaze3d.systems.AutoStorageIndexBuffer autoIndices =
+                new com.mojang.blaze3d.systems.AutoStorageIndexBuffer(VertexFormat.Mode.QUADS);
         return autoIndices.type();
     }
 
     public static GpuBufferSlice writeTransform(Matrix4fc modelView, Vector4fc colorModulator, Vector3fc modelOffset, Matrix4fc textureMatrix) {
-        return RenderSystem.getDynamicUniforms().writeTransform(
+        return RenderSystemExtensions.getDynamicUniforms().writeTransform(
                 modelView, colorModulator, modelOffset, textureMatrix
         );
     }
@@ -218,7 +205,7 @@ public class LuminRenderSystem {
                 RenderSystem.getModelViewMatrix(),
                 new Vector4f(1, 1, 1, 1),
                 new Vector3f(0, 0, 0),
-                TextureTransform.DEFAULT_TEXTURING.getMatrix()
+                new org.joml.Matrix4f()
         );
     }
 
@@ -271,7 +258,7 @@ public class LuminRenderSystem {
         private LuminTexture colorTexture;
         private GpuTexture depthTexture;
         private GpuTextureView depthView;
-        private final Identifier identifier;
+        private final ResourceLocation resourceLocation;
         private final boolean useDepth;
         private int width;
         private int height;
@@ -281,7 +268,7 @@ public class LuminRenderSystem {
             this.width = width;
             this.height = height;
             this.useDepth = useDepth;
-            this.identifier = Identifier.of("openlumin", "lumin-rt" + name);
+            this.resourceLocation = ResourceLocation.fromNamespaceAndPath("openlumin", "lumin-rt" + name);
             createTextures();
         }
 
@@ -295,7 +282,7 @@ public class LuminRenderSystem {
 
         private void createTextures() {
             closed = false;
-            var device = RenderSystem.getDevice();
+            var device = RenderSystemExtensions.getDevice();
 
             final var colorTexture = device.createTexture(
                     "lumin-rt-color",
@@ -315,7 +302,7 @@ public class LuminRenderSystem {
                 depthView = device.createTextureView(depthTexture);
             }
 
-            final var sampler = RenderSystem.getDevice().createSampler(
+            final var sampler = RenderSystemExtensions.getDevice().createSampler(
                     AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE,
                     FilterMode.NEAREST, FilterMode.NEAREST,
                     1, OptionalDouble.empty()
@@ -323,7 +310,7 @@ public class LuminRenderSystem {
 
             this.colorTexture = new LuminTexture(colorTexture, colorView, sampler);
 
-            Minecraft.getInstance().getTextureManager().register(identifier, getColorTexture());
+            Minecraft.getInstance().getTextureManager().register(resourceLocation, getColorTexture());
         }
 
         public void resize(int newWidth, int newHeight) {
@@ -334,12 +321,12 @@ public class LuminRenderSystem {
             createTextures();
         }
 
-        public Identifier getIdentifier() {
-            return identifier;
+        public ResourceLocation getIdentifier() {
+            return resourceLocation;
         }
 
         public void clear() {
-            var encoder = RenderSystem.getDevice().createCommandEncoder();
+            var encoder = RenderSystemExtensions.getDevice().createCommandEncoder();
             if (useDepth) {
                 encoder.clearColorAndDepthTextures(colorTexture.getTexture(), 0, depthTexture, 1.0);
             } else {
@@ -381,7 +368,7 @@ public class LuminRenderSystem {
                 return;
             }
             closed = true;
-            Minecraft.getInstance().getTextureManager().release(identifier);
+            Minecraft.getInstance().getTextureManager().release(resourceLocation);
             if (depthView != null) depthView.close();
             if (depthTexture != null) depthTexture.close();
             colorTexture = null;

@@ -1,6 +1,6 @@
 package io.github.openlumin.text.minecraft;
 
-import com.mojang.blaze3d.platform.GpuSampler;
+import io.github.openlumin.shim.com.mojang.blaze3d.platform.GpuSampler;
 
 public interface EpsilonTextRenderable {
 

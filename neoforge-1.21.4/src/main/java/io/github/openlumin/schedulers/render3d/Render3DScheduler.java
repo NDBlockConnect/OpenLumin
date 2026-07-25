@@ -1,14 +1,13 @@
 package io.github.openlumin.schedulers.render3d;
 
 import net.minecraft.resources.ResourceLocation;
+import io.github.openlumin.LuminPipeline;
 import io.github.openlumin.immediate.LuminImmediateRenderer;
 import io.github.openlumin.shaders.BlurShader;
-import com.mojang.blaze3d.pipeline.DepthStencilState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.CompareOp;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.renderer.RenderPipelines;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.AABB;
@@ -26,16 +25,18 @@ public final class Render3DScheduler {
 
     public static final Render3DScheduler INSTANCE = new Render3DScheduler();
 
-    private static final RenderPipeline FILLED_BOX_PIPELINE = RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin", "pipeline/filled_box"))
-            .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
-            .withCull(false)
+    private static final LuminPipeline FILLED_BOX_PIPELINE = LuminPipeline
+            .builder(ResourceLocation.fromNamespaceAndPath("openlumin", "pipeline/filled_box"))
+            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
+            .withVertexShader(ResourceLocation.fromNamespaceAndPath("openlumin", "rectangle"))
+            .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin", "rectangle"))
             .build();
 
-    private static final RenderPipeline LINES_PIPELINE = RenderPipeline.builder(RenderPipelines.LINES_SNIPPET)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin", "pipeline/lines"))
-            .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
-            .withCull(false)
+    private static final LuminPipeline LINES_PIPELINE = LuminPipeline
+            .builder(ResourceLocation.fromNamespaceAndPath("openlumin", "pipeline/lines"))
+            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.LINES)
+            .withVertexShader(ResourceLocation.fromNamespaceAndPath("openlumin", "triangle"))
+            .withFragmentShader(ResourceLocation.fromNamespaceAndPath("openlumin", "triangle"))
             .build();
 
     private final List<BlurredBoxCommand> blurredBoxes = new ArrayList<>();

@@ -8,6 +8,7 @@ import io.github.openlumin.utils.render.ScissorUtils;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.systems.RenderSystemExtensions;
 import net.minecraft.util.ARGB;
 import org.lwjgl.system.MemoryUtil;
 
@@ -105,13 +106,13 @@ public class RoundRectRenderer implements IRenderer {
         if (info == null || info.colorView() == null) return;
         if (scissorEnabled && !ScissorUtils.isVisible(scissorW, scissorH)) return;
 
-        try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
+        try (RenderPass pass = RenderSystemExtensions.getDevice().createCommandEncoder().createRenderPass(
                 () -> "Round Rect Draw", info.colorView(), OptionalInt.empty(),
                 info.depthView(), OptionalDouble.empty())
         ) {
             pass.setPipeline(LuminRenderPipelines.ROUND_RECT);
             if (scissorEnabled) ScissorUtils.enableScissor(pass, scissorX, scissorY, scissorW, scissorH);
-            RenderSystem.bindDefaultUniforms(pass);
+            // TODO: RenderSystem.bindDefaultUniforms not available in NeoForge 1.21.4
             pass.setUniform("DynamicTransforms", info.dynamicUniforms());
             drawPrepared(pass, info);
         }
