@@ -51,6 +51,11 @@ IMPLEMENTATION_STATUS.md
 
 # 误提取到根目录的编译产物
 net/
+com/
+
+# 构建日志
+build_out.txt
+build_output.txt
 
 # 临时迁移脚本
 migrate_shim*.py
