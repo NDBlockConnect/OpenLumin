@@ -38,7 +38,7 @@ include("neoforge-26.1")
 // ========================================
 include("neoforge-1.21.10")
 include("fabric-1.21.10")
-include("forge-1.21.10")
+// include("forge-1.21.10")  // TODO: Forge 尚未发布 1.21.10 版本，暂时禁用
 
 include("neoforge-1.21.4")
 include("fabric-1.21.4")

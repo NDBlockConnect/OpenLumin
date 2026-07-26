@@ -1,7 +1,11 @@
 #version 410 core
 
 #moj_import <minecraft:dynamictransforms.glsl>
-uniform mat4 ProjMat;
+
+// MC 1.21.10+ uses UBO for projection matrix
+layout(std140) uniform Projection {
+    mat4 ProjMat;
+};
 
 in vec3 Position;
 in vec4 Color;

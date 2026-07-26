@@ -1,6 +1,9 @@
-// Dynamic model-view transform uniforms
-// Provided by OpenLumin for NeoForge 1.21.4 compatibility
-// (equivalent to Fabric's minecraft:dynamictransforms.glsl)
+#version 330
 
-uniform mat4 ModelViewMat;
-uniform mat3 NormalMat;
+layout(std140) uniform DynamicTransforms {
+    mat4 ModelViewMat;
+    vec4 ColorModulator;
+    vec3 ModelOffset;
+    mat4 TextureMat;
+    float LineWidth;
+};

@@ -1,5 +1,4 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-import org.gradle.api.tasks.bundling.DuplicatesStrategy
 
 plugins {
     id("net.minecraftforge.gradle") version "6.0.24"
@@ -35,12 +34,12 @@ tasks {
         from(project(":common").sourceSets.main.get().output)
         archiveBaseName.set("OpenLumin-forge-1.21.10")
         configurations = listOf(project.configurations.runtimeClasspath.get())
-        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        duplicatesStrategy = org.gradle.api.file.DuplicatesStrategy.EXCLUDE
     }
 
     processResources {
         from(project(":common").sourceSets.main.get().resources)
-        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        duplicatesStrategy = org.gradle.api.file.DuplicatesStrategy.EXCLUDE
 
         inputs.property("version", project.version)
 

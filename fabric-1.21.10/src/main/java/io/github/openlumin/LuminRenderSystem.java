@@ -152,10 +152,10 @@ public class LuminRenderSystem {
      * 1.21.10：用 CachedOrthoProjectionMatrixBuffer 设置正交投影矩阵。
      */
     public static void applyOrthoProjection() {
-        RenderSystem.setProjectionMatrix(
-                guiProjectionMatrixBuffer.getBuffer(getScaledWidth(), getScaledHeight()),
-                ProjectionType.ORTHOGRAPHIC
-        );
+        float w = getScaledWidth();
+        float h = getScaledHeight();
+        GpuBufferSlice projBuffer = guiProjectionMatrixBuffer.getBuffer(w, h);
+        RenderSystem.setProjectionMatrix(projBuffer, ProjectionType.ORTHOGRAPHIC);
     }
 
     public static GpuTextureView resolveColorView() {

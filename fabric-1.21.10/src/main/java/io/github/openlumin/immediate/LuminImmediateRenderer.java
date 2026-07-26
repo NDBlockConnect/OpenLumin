@@ -261,16 +261,21 @@ public final class LuminImmediateRenderer {
             long completedOffset = this.currentOffset;
 
             try {
-                if (this.vertexCount <= 0) return;
+                if (this.vertexCount <= 0) {
+                    return;
+                }
                 if (this.ringBuffer.isMapped()) this.ringBuffer.unmap();
 
                 GpuTextureView colorView = LuminRenderSystem.resolveColorView();
                 GpuTextureView depthView = LuminRenderSystem.resolveDepthView();
-                if (colorView == null) return;
+                if (colorView == null) {
+                    return;
+                }
 
                 // 1.21.10：writeTransform 增加第5参数 lineWidth=1.0f，TextureTransform → 单位矩阵
+                Matrix4f mvMatrix = RenderSystem.getModelViewMatrix();
                 GpuBufferSlice dynamicUniforms = RenderSystemExtensions.getDynamicUniforms().writeTransform(
-                        RenderSystem.getModelViewMatrix(),
+                        mvMatrix,
                         new Vector4f(1, 1, 1, 1),
                         new Vector3f(0, 0, 0),
                         new Matrix4f(),
@@ -310,16 +315,21 @@ public final class LuminImmediateRenderer {
                                 var autoIndices = RenderSystem.getSequentialBuffer(this.mode);
                                 GpuBuffer ibo = autoIndices.getBuffer(indexCount);
                                 pass.setIndexBuffer(ibo, autoIndices.type());
-                                pass.drawIndexed(Math.toIntExact(this.batchStartOffset / this.stride), 0, indexCount, 1);
+                                int baseVertex = Math.toIntExact(this.batchStartOffset / this.stride);
+                                pass.drawIndexed(baseVertex, 0, indexCount, 1);
                                 submittedDraw = true;
                             }
                         }
                         default -> {
-                            pass.draw(Math.toIntExact(this.batchStartOffset / this.stride), this.vertexCount);
+                            int baseVertex = Math.toIntExact(this.batchStartOffset / this.stride);
+                            pass.draw(baseVertex, this.vertexCount);
                             submittedDraw = true;
                         }
                     }
                 }
+            } catch (Exception e) {
+                System.err.println("[OpenLumin] LuminImmediateRenderer drawAndReset error: " + e.getMessage());
+                e.printStackTrace();
             } finally {
                 if (this.ringBuffer.isMapped()) this.ringBuffer.unmap();
                 if (submittedDraw) {
