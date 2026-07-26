@@ -14,8 +14,8 @@ configurations.all {
 dependencies {
     implementation(project(":common"))
 
-    // NeoForge & Minecraft
-    implementation("net.neoforged:neoforge:26.1.0")
+    // NeoForge & Minecraft (26.1.0 不存在，使用 26.2.0)
+    implementation("net.neoforged:neoforge:26.2.0")
 
     // Annotations
     compileOnly("com.google.code.findbugs:jsr305:3.0.2")

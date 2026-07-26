@@ -88,26 +88,17 @@ public class OpenLuminFabric1210Client implements ClientModInitializer {
     // =========================================================================
 
     private static void render2D(int screenW, int screenH) {
-        try {
-            LuminRenderSystem.applyOrthoProjection();
+        LuminRenderSystem.applyOrthoProjection();
+        Matrix4f matrix = RenderSystem.getModelViewMatrix();
+        float x = screenW - 220f;
+        float y = 10f;
 
-            // 测试简化：使用屏幕左上角 (10, 10) 而非右上角计算坐标
-            Matrix4f matrix = RenderSystem.getModelViewMatrix();
-            float x = 10f;
-            float y = 10f;
-
-            // 1-3. LuminImmediateRenderer — PosColor 矩形（蓝/绿/半透明白）
-            fillRect(matrix, x, y,        200f, 40f, 0xFF4488FF);
-            fillRect(matrix, x, y + 50f,  200f, 40f, 0xFF44CC55);
-            fillRect(matrix, x, y + 100f, 200f, 40f, 0x8DFFFFFF);
-        } catch (Throwable t) {
-            System.err.println("[OpenLumin] render2D error: " + t.getMessage());
-            t.printStackTrace();
-            throw t;
-        }
+        // 1-3. LuminImmediateRenderer — PosColor 矩形（蓝/绿/半透明白）
+        fillRect(matrix, x, y,        200f, 40f, 0xFF4488FF);
+        fillRect(matrix, x, y + 50f,  200f, 40f, 0xFF44CC55);
+        fillRect(matrix, x, y + 100f, 200f, 40f, 0x8DFFFFFF);
 
         // 4-6. RoundRectRenderer — 圆角矩形 / 渐变 / 独立圆角
-        /*
         roundRects().addRoundRect(x, y + 155f, 200f, 40f, 10f, new Color(0xFF, 0x88, 0x22));
         roundRects().addVerticalGradient(x, y + 205f, 200f, 40f, 6f,
                 new Color(0xAA, 0x44, 0xFF), new Color(0x22, 0xCC, 0xFF));
@@ -138,23 +129,16 @@ public class OpenLuminFabric1210Client implements ClientModInitializer {
             Render3DScheduler.INSTANCE.addLine(center, center.add(0, 3, 0), new Color(0x44, 0xFF, 0x44), 1.5f);
             Render3DScheduler.INSTANCE.addLine(center, center.add(0, 0, 3), new Color(0x44, 0x44, 0xFF), 1.5f);
         }
-        */
     }
 
     private static void fillRect(Matrix4f matrix, float x, float y, float w, float h, int color) {
-        try {
-            LuminImmediateRenderer.PosColorQuads builder =
-                    LuminImmediateRenderer.beginPosColorQuads(LuminRenderPipelines.RECTANGLE);
-            builder.vertex(matrix, x,     y,     0f, color);
-            builder.vertex(matrix, x,     y + h, 0f, color);
-            builder.vertex(matrix, x + w, y + h, 0f, color);
-            builder.vertex(matrix, x + w, y,     0f, color);
-            builder.end();
-        } catch (Throwable t) {
-            System.err.println("[OpenLumin] fillRect error: " + t.getMessage());
-            t.printStackTrace();
-            throw t;
-        }
+        LuminImmediateRenderer.PosColorQuads builder =
+                LuminImmediateRenderer.beginPosColorQuads(LuminRenderPipelines.RECTANGLE);
+        builder.vertex(matrix, x,     y,     0f, color);
+        builder.vertex(matrix, x,     y + h, 0f, color);
+        builder.vertex(matrix, x + w, y + h, 0f, color);
+        builder.vertex(matrix, x + w, y,     0f, color);
+        builder.end();
     }
 
     // =========================================================================

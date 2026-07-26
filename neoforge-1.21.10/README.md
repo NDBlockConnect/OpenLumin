@@ -1,7 +1,7 @@
 # neoforge-1.21.10
 
-本模块的源码从以下位置引用：
-- Java 代码: ../src/main/java (通过 build.gradle.kts 的 from() 引入)
-- 资源文件: ../common/src/main/resources (着色器等)
+锟斤拷模锟斤拷锟皆达拷锟斤拷锟斤拷锟斤拷位锟斤拷锟斤拷锟矫ｏ拷
+- Java 锟斤拷锟斤拷: ../src/main/java (通锟斤拷 build.gradle.kts 锟斤拷 from() 锟斤拷锟斤拷)
+- 锟斤拷源锟侥硷拷: ../common/src/main/resources (锟斤拷色锟斤拷锟斤拷)
 
-实际开发时，如需版本特定的适配代码，在 src/main/java 中添加。
+实锟绞匡拷锟斤拷时锟斤拷锟斤拷锟斤拷姹撅拷囟锟斤拷锟斤拷锟斤拷锟斤拷锟诫，锟斤拷 src/main/java 锟斤拷锟斤拷锟接★拷

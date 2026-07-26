@@ -30,8 +30,8 @@ include("common")
 // ========================================
 // 2026.x+ (New versioning system)
 // ========================================
-include("neoforge-26.2")
-include("neoforge-26.1")
+// include("neoforge-26.2")  // TODO: MC 1.26.2 尚未发布，NeoForge 26.x 系列不存在
+// include("neoforge-26.1")  // TODO: MC 1.26.1 尚未发布，NeoForge 26.x 系列不存在
 
 // ========================================
 // 1.21.x (11+ versions)
