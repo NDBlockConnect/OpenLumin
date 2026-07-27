@@ -32,6 +32,11 @@ public class LuminRenderPipelines {
             .withBlend(BlendFunction.TRANSLUCENT)
             .buildSnippet();
 
+    public final static RenderPipeline.Snippet WORLD_LINES_SNIPPET = RenderPipeline.builder(BASE_SNIPPET)
+            .withUniform("Globals", UniformType.UNIFORM_BUFFER)
+            .withUniform("Fog", UniformType.UNIFORM_BUFFER)
+            .buildSnippet();
+
     public final static RenderPipeline RECTANGLE = RenderPipeline.builder(BASE_SNIPPET)
             .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin","pipelines/rectangle"))
             .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)

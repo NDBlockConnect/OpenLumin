@@ -3,14 +3,11 @@ package io.github.openlumin;
 import io.github.openlumin.immediate.LuminImmediateRenderer;
 import io.github.openlumin.renderers.RoundRectRenderer;
 import io.github.openlumin.schedulers.render2d.Render2DScheduler;
-import io.github.openlumin.schedulers.render3d.Render3DScheduler;
 import io.github.openlumin.text.ttf.TtfFontLoader;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 
 import java.awt.Color;
@@ -21,7 +18,7 @@ import java.nio.file.Path;
  *
  * 2D 层 (HudRenderCallback)：
  *   LuminImmediateRenderer / RoundRectRenderer / Render2DScheduler / TtfTextRenderer
- * 3D 层 (WorldRenderEvents.LAST)：
+ * 3D 层 (LevelRendererMixin)：
  *   Render3DScheduler — 玩家轮廓框 + 填充半透明盒 + 坐标轴
  *
  * 帧生命周期由钩子统一管理：
@@ -72,15 +69,13 @@ public class OpenLuminFabric1210Client implements ClientModInitializer {
                 System.err.println("[OpenLumin] 2D render error: " + e);
                 e.printStackTrace();
             } finally {
-                // 重置所有 DynamicUniformStorage 写入指针，下帧复用槽位
+                LuminImmediateRenderer.endFrame();
                 LuminRenderSystem.endDynamicUniformFrame();
             }
         });
 
-        // ── 3D 世界渲染钩子 ───────────────────────────────────────────────────
-        // TODO: WorldRenderEvents 已在 fabric-rendering-v1 16.2.0+1.21.10 中移除。
-        // 需通过 Mixin 注入 LevelRenderer.renderLevel() 实现3D渲染钩子。
-        // Render3DScheduler 测试留待 Mixin 方案完成后补充。
+        // 3D 图元由 LevelRendererMixin 在世界渲染末尾创建并立即刷新，
+        // 避免 HUD 阶段排队导致跨帧矩阵和相机状态错配。
     }
 
     // =========================================================================
@@ -117,18 +112,6 @@ public class OpenLuminFabric1210Client implements ClientModInitializer {
         layer.addGradientText("Gradient Text", x, y + 490f, 1.0f,
                 new Color(0xFF, 0x88, 0x00), new Color(0x00, 0xCC, 0xFF), testFont());
         scheduler().flushAndClear();
-
-        // 12-14. Render3DScheduler — 在此 schedule，由 LevelRendererMixin 在 renderLevel 末尾 flush
-        Minecraft mc3d = Minecraft.getInstance();
-        if (mc3d.player != null) {
-            AABB playerBox = mc3d.player.getBoundingBox().inflate(0.3);
-            Render3DScheduler.INSTANCE.addOutlineBox(playerBox, 0xFFFF3333, 2.0f);
-            Render3DScheduler.INSTANCE.addFilledBox(playerBox, new Color(0xFF, 0x33, 0x33, 0x44));
-            Vec3 center = mc3d.player.position().add(0, mc3d.player.getBbHeight() / 2.0, 0);
-            Render3DScheduler.INSTANCE.addLine(center, center.add(3, 0, 0), new Color(0xFF, 0x44, 0x44), 1.5f);
-            Render3DScheduler.INSTANCE.addLine(center, center.add(0, 3, 0), new Color(0x44, 0xFF, 0x44), 1.5f);
-            Render3DScheduler.INSTANCE.addLine(center, center.add(0, 0, 3), new Color(0x44, 0x44, 0xFF), 1.5f);
-        }
     }
 
     private static void fillRect(Matrix4f matrix, float x, float y, float w, float h, int color) {
@@ -140,12 +123,4 @@ public class OpenLuminFabric1210Client implements ClientModInitializer {
         builder.vertex(matrix, x + w, y,     0f, color);
         builder.end();
     }
-
-    // =========================================================================
-    // 3D 世界渲染测试（Render3DScheduler）
-    // =========================================================================
-    // 3D 世界渲染测试 — 待实现
-    // WorldRenderEvents 已在 fabric-rendering-v1 16.2.0+1.21.10 移除，
-    // 需改用 Mixin 注入 LevelRenderer.renderLevel() 实现。
-    // =========================================================================
 }

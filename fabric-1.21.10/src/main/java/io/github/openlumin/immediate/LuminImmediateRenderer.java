@@ -1,7 +1,6 @@
 package io.github.openlumin.immediate;
 
 import io.github.openlumin.LuminRenderSystem;
-import io.github.openlumin.LuminVertexFormats;
 import io.github.openlumin.buffer.LuminRingBuffer;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
@@ -48,9 +47,13 @@ public final class LuminImmediateRenderer {
     private static final Channel POS_COLOR_TRIANGLE_STRIP = new Channel(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.TRIANGLE_STRIP);
     private static final Channel POS_COLOR_TRIANGLE_FAN = new Channel(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.TRIANGLE_FAN);
     private static final Channel POS_TEX_COLOR_QUADS = new Channel(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS);
-    private static final Channel POS_COLOR_NORMAL_LINE_WIDTH_LINES = new Channel(LuminVertexFormats.POSITION_COLOR_NORMAL_LINE_WIDTH, VertexFormat.Mode.LINES);
+    private static final Channel POS_COLOR_NORMAL_LINES = new Channel(DefaultVertexFormat.POSITION_COLOR_NORMAL, VertexFormat.Mode.LINES);
 
     private LuminImmediateRenderer() {}
+
+    public static PosColorQuads beginPosColorQuads(RenderPipeline pipeline, Matrix4f dynamicModelView) {
+        return new PosColorQuads(POS_COLOR_QUADS.begin(pipeline, null, dynamicModelView, 1.0f));
+    }
 
     public static PosColorQuads beginPosColorQuads(RenderPipeline pipeline) {
         return new PosColorQuads(POS_COLOR_QUADS.begin(pipeline, null));
@@ -69,7 +72,11 @@ public final class LuminImmediateRenderer {
     }
 
     public static Lines beginLines(RenderPipeline pipeline) {
-        return new Lines(POS_COLOR_NORMAL_LINE_WIDTH_LINES.begin(pipeline, null));
+        return beginLines(pipeline, RenderSystem.getModelViewMatrix(), 1.0f);
+    }
+
+    public static Lines beginLines(RenderPipeline pipeline, Matrix4f dynamicModelView, float lineWidth) {
+        return new Lines(POS_COLOR_NORMAL_LINES.begin(pipeline, null, dynamicModelView, lineWidth));
     }
 
     public static void endFrame() {
@@ -77,7 +84,7 @@ public final class LuminImmediateRenderer {
         POS_COLOR_TRIANGLE_STRIP.endFrame();
         POS_COLOR_TRIANGLE_FAN.endFrame();
         POS_TEX_COLOR_QUADS.endFrame();
-        POS_COLOR_NORMAL_LINE_WIDTH_LINES.endFrame();
+        POS_COLOR_NORMAL_LINES.endFrame();
     }
 
     public static final class PosColorQuads {
@@ -129,12 +136,11 @@ public final class LuminImmediateRenderer {
         private final Channel channel;
         private final Vector3f normalTmp = new Vector3f();
         private Lines(Channel channel) { this.channel = channel; }
-        public void vertex(Matrix4f matrix, PoseStack.Pose pose, float x, float y, float z, int color, float nx, float ny, float nz, float width) {
+        public void vertex(Matrix4f matrix, PoseStack.Pose pose, float x, float y, float z, int color, float nx, float ny, float nz) {
             this.channel.putPosition(matrix, x, y, z);
             this.channel.putColor(color);
             pose.transformNormal(nx, ny, nz, this.normalTmp).normalize();
             this.channel.putNormal(this.normalTmp.x, this.normalTmp.y, this.normalTmp.z);
-            this.channel.putLineWidth(width);
             this.channel.finishVertex();
         }
         public void end() { this.channel.drawAndReset(); }
@@ -151,7 +157,6 @@ public final class LuminImmediateRenderer {
         private final int colorOffset;
         private final int uvOffset;
         private final int normalOffset;
-        private final int lineWidthOffset;
 
         private final Vector3f posTmp = new Vector3f();
 
@@ -163,6 +168,8 @@ public final class LuminImmediateRenderer {
         private boolean frameUsed;
         private long vertexBaseAddr;
 
+        private Matrix4f dynamicModelView = new Matrix4f();
+        private float lineWidth = 1.0f;
         private RenderPipeline pipeline;
         @Nullable
         private ResourceLocation texture;
@@ -177,7 +184,6 @@ public final class LuminImmediateRenderer {
             this.colorOffset = resolveOffset(format, VertexFormatElement.COLOR);
             this.uvOffset = resolveOffset(format, VertexFormatElement.UV0);
             this.normalOffset = resolveOffset(format, VertexFormatElement.NORMAL);
-            this.lineWidthOffset = resolveOffset(format, LuminVertexFormats.LINE_WIDTH);
         }
 
         private static int resolveOffset(VertexFormat format, VertexFormatElement element) {
@@ -185,6 +191,10 @@ public final class LuminImmediateRenderer {
         }
 
         private Channel begin(RenderPipeline pipeline, @Nullable ResourceLocation texture) {
+            return begin(pipeline, texture, RenderSystem.getModelViewMatrix(), 1.0f);
+        }
+
+        private Channel begin(RenderPipeline pipeline, @Nullable ResourceLocation texture, Matrix4f dynamicModelView, float lineWidth) {
             if (this.building) throw new IllegalStateException("Immediate channel is already building");
             this.building = true;
             this.currentOffset = this.frameOffset;
@@ -192,6 +202,8 @@ public final class LuminImmediateRenderer {
             this.vertexCount = 0;
             this.pipeline = pipeline;
             this.texture = texture;
+            this.dynamicModelView.set(dynamicModelView);
+            this.lineWidth = lineWidth;
             this.ringBuffer.tryMap();
             return this;
         }
@@ -225,11 +237,6 @@ public final class LuminImmediateRenderer {
             MemoryUtil.memPutByte(p, packNormal(nx));
             MemoryUtil.memPutByte(p + 1L, packNormal(ny));
             MemoryUtil.memPutByte(p + 2L, packNormal(nz));
-        }
-
-        private void putLineWidth(float width) {
-            if (this.lineWidthOffset < 0 || !ensureCapacity()) return;
-            MemoryUtil.memPutFloat(this.vertexBaseAddr + this.lineWidthOffset, width);
         }
 
         private void finishVertex() {
@@ -272,14 +279,12 @@ public final class LuminImmediateRenderer {
                     return;
                 }
 
-                // 1.21.10：writeTransform 增加第5参数 lineWidth=1.0f，TextureTransform → 单位矩阵
-                Matrix4f mvMatrix = RenderSystem.getModelViewMatrix();
                 GpuBufferSlice dynamicUniforms = RenderSystemExtensions.getDynamicUniforms().writeTransform(
-                        mvMatrix,
+                        this.dynamicModelView,
                         new Vector4f(1, 1, 1, 1),
                         new Vector3f(0, 0, 0),
                         new Matrix4f(),
-                        1.0f
+                        this.lineWidth
                 );
 
                 try (RenderPass pass = RenderSystemExtensions.getDevice().createCommandEncoder().createRenderPass(
@@ -341,6 +346,8 @@ public final class LuminImmediateRenderer {
                 this.batchStartOffset = this.frameOffset;
                 this.vertexCount = 0;
                 this.vertexBaseAddr = 0L;
+                this.dynamicModelView.identity();
+                this.lineWidth = 1.0f;
                 this.pipeline = null;
                 this.texture = null;
             }
