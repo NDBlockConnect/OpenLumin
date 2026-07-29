@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "openlumin-testmod",
+  "version": "1.0.0",
+  "name": "OpenLumin Test Mod",
+  "description": "Test cases for OpenLumin rendering library",
+  "authors": ["OpenLumin Team"],
+  "contact": {
+    "homepage": "https://github.com/your-org/OpenLumin",
+    "sources": "https://github.com/your-org/OpenLumin"
+  },
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "io.github.openlumin.testmod.OpenLuminTestMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.9",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "openlumin": "*"
+  }
+}

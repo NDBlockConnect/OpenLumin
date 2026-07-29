@@ -2,6 +2,7 @@ package io.github.openlumin.immediate;
 
 import io.github.openlumin.LuminRenderSystem;
 import io.github.openlumin.buffer.LuminRingBuffer;
+import io.github.openlumin.platform.PlatformRegistry;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
@@ -30,13 +31,10 @@ import java.util.OptionalInt;
 import net.minecraft.client.Minecraft;
 
 /**
- * fabric-1.21.10 override：
- * - GpuTextureView 改用 textures 包
- * - writeTransform 增加第5参数 lineWidth=1.0f
- * - bindTexture(3args) → bindSampler(2args)
- * - AutoStorageIndexBuffer → RenderSystem.getSequentialBuffer()
- * - TextureTransform → new Matrix4f()
- * - AbstractTextureExtensions → AbstractTexture.getColorTextureView()
+ * 即时模式渲染器 - OpenLumin 核心组件。
+ *
+ * 支持多种顶点格式（Position+Color, Position+Tex+Color, Lines）和绘制模式
+ * （Quads, TriangleStrip, TriangleFan）。通过环形缓冲区批量提交顶点数据。
  */
 public final class LuminImmediateRenderer {
 
@@ -72,7 +70,7 @@ public final class LuminImmediateRenderer {
     }
 
     public static Lines beginLines(RenderPipeline pipeline) {
-        return beginLines(pipeline, RenderSystem.getModelViewMatrix(), 1.0f);
+        return beginLines(pipeline, LuminRenderSystem.getModelViewMatrix(), 1.0f);
     }
 
     public static Lines beginLines(RenderPipeline pipeline, Matrix4f dynamicModelView, float lineWidth) {
@@ -191,7 +189,7 @@ public final class LuminImmediateRenderer {
         }
 
         private Channel begin(RenderPipeline pipeline, @Nullable ResourceLocation texture) {
-            return begin(pipeline, texture, RenderSystem.getModelViewMatrix(), 1.0f);
+            return begin(pipeline, texture, LuminRenderSystem.getModelViewMatrix(), 1.0f);
         }
 
         private Channel begin(RenderPipeline pipeline, @Nullable ResourceLocation texture, Matrix4f dynamicModelView, float lineWidth) {
@@ -295,7 +293,7 @@ public final class LuminImmediateRenderer {
                     pass.setPipeline(this.pipeline);
                     // 1.21.10：bindDefaultUniforms 绑定所有系统 UBO（Projection、Globals、Fog 等）
                     // 必须在 setPipeline 之后、setUniform 之前调用，否则 ProjMat 为零矩阵 → 顶点全被裁剪
-                    RenderSystem.bindDefaultUniforms(pass);
+                    LuminRenderSystem.bindDefaultUniforms(pass);
                     pass.setUniform("DynamicTransforms", dynamicUniforms);
                     pass.setVertexBuffer(0, this.ringBuffer.getGpuBuffer());
 

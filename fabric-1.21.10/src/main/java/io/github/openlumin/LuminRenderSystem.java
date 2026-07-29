@@ -1,5 +1,6 @@
 package io.github.openlumin;
 
+import io.github.openlumin.platform.PlatformRegistry;
 import io.github.openlumin.text.StaticFontLoader;
 import io.github.openlumin.holders.RenderTargetHolder;
 import io.github.openlumin.holders.RendererHolder;
@@ -29,13 +30,10 @@ import java.util.OptionalDouble;
 import net.minecraft.client.Minecraft;
 
 /**
- * fabric-1.21.10 override：
- * - Projection/ProjectionMatrixBuffer → CachedOrthoProjectionMatrixBuffer
- * - platform.GpuTexture/GpuTextureView → textures.*
- * - GpuSampler 已移除（1.21.10 不再需要）
- * - writeTransform 第5参数 lineWidth=1.0f
- * - getQuadIndexBuffer/Type → RenderSystem.getSequentialBuffer()
- * - TextureTransform.DEFAULT_TEXTURING → new Matrix4f()（单位矩阵）
+ * OpenLumin 渲染系统统一封装层。
+ *
+ * 通过平台抽象层（LuminPlatform）支持 Fabric/Forge/NeoForge 跨加载器兼容，
+ * 隔离不同 Minecraft 版本的 API 差异。
  */
 public class LuminRenderSystem {
 
@@ -161,13 +159,29 @@ public class LuminRenderSystem {
 
     public static GpuTextureView resolveColorView() {
         if (activeTarget != null) return activeTarget.colorView();
-        return Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
+        return PlatformRegistry.get().resolveColorView();
     }
 
     @Nullable
     public static GpuTextureView resolveDepthView() {
         if (activeTarget != null) return activeTarget.depthView();
-        return Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
+        return PlatformRegistry.get().resolveDepthView();
+    }
+
+    /**
+     * 获取当前模型视图矩阵（通过平台抽象层）。
+     * 封装 PlatformRegistry.get().getModelViewMatrix() 调用，提供统一入口。
+     */
+    public static Matrix4f getModelViewMatrix() {
+        return PlatformRegistry.get().getModelViewMatrix();
+    }
+
+    /**
+     * 绑定默认 uniform（通过平台抽象层）。
+     * 封装 PlatformRegistry.get().bindDefaultUniforms() 调用，提供统一入口。
+     */
+    public static void bindDefaultUniforms(com.mojang.blaze3d.systems.RenderPass pass) {
+        PlatformRegistry.get().bindDefaultUniforms(pass);
     }
 
     public static QuadRenderingInfo prepareQuadRendering(int vertexCount) {
@@ -188,7 +202,7 @@ public class LuminRenderSystem {
 
         // 1.21.10：TextureTransform 改用单位矩阵，writeTransform 增加第5参数 lineWidth=1.0f
         GpuBufferSlice dynamicUniforms = writeTransform(
-                RenderSystem.getModelViewMatrix(),
+                getModelViewMatrix(),
                 new Vector4f(1, 1, 1, 1),
                 new Vector3f(0, 0, 0),
                 new Matrix4f()
@@ -198,10 +212,10 @@ public class LuminRenderSystem {
     }
 
     /**
-     * 1.21.10：通过 RenderSystem.getSequentialBuffer() 获取共享 quad index buffer。
+     * 1.21.10：通过平台抽象层获取共享 quad index buffer。
      */
     public static GpuBuffer getQuadIndexBuffer(int indexCount) {
-        return RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(indexCount);
+        return PlatformRegistry.get().getSequentialBuffer(VertexFormat.Mode.QUADS, indexCount);
     }
 
     public static VertexFormat.IndexType getQuadIndexType() {
@@ -239,7 +253,7 @@ public class LuminRenderSystem {
 
     public static GpuBufferSlice writeDefaultGuiTransform() {
         return writeTransform(
-                RenderSystem.getModelViewMatrix(),
+                getModelViewMatrix(),
                 new Vector4f(1, 1, 1, 1),
                 new Vector3f(0, 0, 0),
                 new Matrix4f()

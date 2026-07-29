@@ -4,6 +4,7 @@ import io.github.openlumin.LuminRenderPipelines;
 import io.github.openlumin.LuminRenderSystem;
 import io.github.openlumin.buffer.LuminRingBuffer;
 import io.github.openlumin.holders.RendererHolder;
+import io.github.openlumin.platform.PlatformRegistry;
 import io.github.openlumin.utils.render.ScissorUtils;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.systems.RenderPass;
@@ -17,9 +18,9 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
 /**
- * fabric-1.21.10 override：
- * 在 draw() 中补充 RenderSystem.bindDefaultUniforms(pass)，
- * 确保 Projection UBO 正确绑定（common 版本因 NeoForge 1.21.4 兼容性问题跳过了此调用）。
+ * 圆角矩形渲染器。
+ *
+ * 支持四角独立圆角半径、纯色和渐变填充、SDF 抗锯齿。
  */
 public class RoundRectRenderer implements IRenderer {
 
@@ -118,7 +119,7 @@ public class RoundRectRenderer implements IRenderer {
             pass.setPipeline(LuminRenderPipelines.ROUND_RECT);
             // fabric-1.21.10: 绑定 Projection / Globals / Fog 等系统 UBO
             // 必须在 setPipeline 之后调用，否则 ProjMat UBO 未绑定 → 顶点全被裁剪
-            RenderSystem.bindDefaultUniforms(pass);
+            LuminRenderSystem.bindDefaultUniforms(pass);
             pass.setUniform("DynamicTransforms", info.dynamicUniforms());
             drawPrepared(pass, info);
         }

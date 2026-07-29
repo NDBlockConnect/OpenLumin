@@ -1,8 +1,0 @@
-{
-  "required": true,
-  "package": "io.github.openlumin.mixin",
-  "compatibilityLevel": "JAVA_21",
-  "mixins": [],
-  "client": [],
-  "injectors": {"defaultRequire": 1}
-}

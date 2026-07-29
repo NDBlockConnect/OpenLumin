@@ -2,6 +2,7 @@ package io.github.openlumin.schedulers.render2d;
 
 import io.github.openlumin.LuminRenderPipelines;
 import io.github.openlumin.LuminRenderSystem;
+import io.github.openlumin.platform.PlatformRegistry;
 import io.github.openlumin.renderers.*;
 import io.github.openlumin.text.ttf.TtfFontLoader;
 
@@ -20,7 +21,7 @@ import java.util.List;
 
 /**
  * 2D GUI 渲染调度器。
- * <p>
+ *
  * GUI 只提交声明式绘制命令；调度器负责 layer、scissor、空间桶、批次规划和 renderer 复用。
  */
 public final class Render2DScheduler implements AutoCloseable {
@@ -187,7 +188,7 @@ public final class Render2DScheduler implements AutoCloseable {
             pass.setPipeline(pipeline);
             // fabric-1.21.10: 绑定 Projection / Globals / Fog 等系统 UBO
             // 必须在 setPipeline 之后、draw 之前调用，否则 ProjMat UBO 未绑定 → 顶点全被裁剪
-            RenderSystem.bindDefaultUniforms(pass);
+            LuminRenderSystem.bindDefaultUniforms(pass);
             for (int i = start; i < end; i++) {
                 batches.get(i).renderers().draw(pass);
             }

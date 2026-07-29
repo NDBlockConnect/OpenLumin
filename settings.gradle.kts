@@ -28,96 +28,22 @@ dependencyResolutionManagement {
 include("common")
 
 // ========================================
-// 2026.x+ (New versioning system)
+// 主分支（main）- 当前活跃开发版本
 // ========================================
-// include("neoforge-26.2")  // TODO: MC 1.26.2 尚未发布，NeoForge 26.x 系列不存在
-// include("neoforge-26.1")  // TODO: MC 1.26.1 尚未发布，NeoForge 26.x 系列不存在
+// 基底开发版本（OpenGL）
+include("fabric-1.21.10")   // OpenGL 基底 - Phase 2 已完成
+include("neoforge-1.21.10")  // OpenGL 基底 - Phase 3 待实施
+
+// 参考实现（旧版 OpenGL）
+include("fabric-1.21.4")     // 完整 OpenGL 实现参考
+include("neoforge-1.21.4")   // 完整 OpenGL 实现参考
 
 // ========================================
-// 1.21.x (11+ versions)
+// 其他版本已移至独立分支
 // ========================================
-include("neoforge-1.21.10")
-include("fabric-1.21.10")
-// include("forge-1.21.10")  // TODO: Forge 尚未发布 1.21.10 版本，暂时禁用
+// - forge-1.21.10 → 分支 forge-1.21.10
+// - forge-1.21.4  → 分支 forge-1.21.4
+// - neoforge-26.1 → 分支 neoforge-26.1
+// - neoforge-26.2 → 分支 neoforge-26.2
+// - 1.20.x, 1.19.x, 1.18.x 等 → 各自独立分支
 
-include("neoforge-1.21.4")
-include("fabric-1.21.4")
-include("forge-1.21.4")
-
-include("neoforge-1.21.3")
-include("fabric-1.21.3")
-include("forge-1.21.3")
-
-include("neoforge-1.21.1")
-include("fabric-1.21.1")
-include("forge-1.21.1")
-
-// ========================================
-// 1.20.x
-// ========================================
-include("neoforge-1.20.6")
-include("fabric-1.20.6")
-include("forge-1.20.6")
-
-include("neoforge-1.20.5")
-include("fabric-1.20.5")
-include("forge-1.20.5")
-
-include("neoforge-1.20.4")
-include("fabric-1.20.4")
-include("forge-1.20.4")
-
-include("neoforge-1.20.2")
-include("fabric-1.20.2")
-include("forge-1.20.2")
-
-include("fabric-1.20.1")
-include("forge-1.20.1")
-
-// ========================================
-// 1.19.x
-// ========================================
-include("fabric-1.19.4")
-include("forge-1.19.4")
-
-include("fabric-1.19.3")
-include("forge-1.19.3")
-
-include("fabric-1.19.2")
-include("forge-1.19.2")
-
-// ========================================
-// 1.18.x
-// ========================================
-include("fabric-1.18.2")
-include("forge-1.18.2")
-
-// ========================================
-// 1.17.x (MatrixStack → PoseStack boundary)
-// ========================================
-include("fabric-1.17.1")
-include("forge-1.17.1")
-
-// ========================================
-// 1.16.x
-// ========================================
-include("fabric-1.16.5")
-include("forge-1.16.5")
-
-// ========================================
-// 1.15.x
-// ========================================
-include("fabric-1.15.2")
-include("forge-1.15.2")
-
-// ========================================
-// 1.14.x
-// ========================================
-include("fabric-1.14.4")
-include("forge-1.14.4")
-
-// ========================================
-// 1.13.x (oldest supported)
-// ========================================
-include("fabric-1.13.2")
-include("forge-1.13.2")
