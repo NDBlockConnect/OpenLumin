@@ -1,94 +1,174 @@
 # OpenLumin
 
-**English** | [简体中文](README_zh.md)
+[English](README.md) | **简体中文**
 
 **OpenLumin** 是专为 Minecraft Java Edition 模组设计的高性能 2D/3D 渲染库。  
 最初从 Epsilon HvH 客户端（NekoyaHouse）中提取，现作为独立库维护，为任意模组提供统一、跨版本的渲染 API。
 
-> **v26.0 Alpha 1** — Fabric 1.21.10 现已发布，更多平台持续接入中。
+> **🎉 v26.0 Alpha 1 已发布！** — Fabric 1.21.10 版本现已提供平台抽象层支持。  
+> [下载](releases/v26.0-alpha.1) | [发布说明](releases/v26.0-alpha.1/RELEASE_NOTES.md) | [测试结果](memory/FACT.md#架构重构完整完成)
 
----
+## 特性
 
-## 核心特性
+### 2D 渲染
+- **即时模式渲染器** - 高性能批量渲染
+  - 矩形、圆角矩形、三角形、阴影
+  - 纹理渲染（256 条目 LRU 缓存）
+  - TTF 字体渲染（抗锯齿）
+  - 精确的裁剪坐标变换
 
-| 特性 | 说明 |
-|------|------|
-| 🎨 **2D 即时渲染** | 矩形、圆角矩形、椭圆、弧形、阴影、渐变，一行代码完成 |
-| ✏️ **TTF 字体渲染** | 加载系统/自定义 TTF，支持 SDF 抗锯齿，图集批处理 |
-| 🌍 **3D 世界渲染** | 线框盒体、填充盒体、自由线段，世界空间直接绘制 |
-| ✨ **后处理特效** | 高斯模糊、FXAA 抗锯齿、颜色滤镜 |
-| 🎬 **动态 GLSL Sandbox** | 运行时编译自定义着色器，内置程序化背景特效 |
-| 📦 **声明式调度器** | `Render2DScheduler` 按 layer 批量提交，自动合批 |
-| 🔄 **跨平台/跨版本** | Fabric / NeoForge / Forge，MC 1.14 ~ 1.21.10 |
+### 3D 世界渲染
+- **世界空间几何体** - 在 3D 世界中渲染
+  - 填充/线框盒子
+  - 模糊盒效果
+  - 自由线条渲染
 
----
+### Shader 系统
+- **完整的 GLSL 支持**
+  - 高斯模糊着色器（支持圆角矩形遮罩）
+  - FXAA 抗锯齿
+  - 颜色滤镜着色器
+  - 程序化背景特效（黑洞、外星地形、云层）
 
-## 当前发布状态
+### 架构
+- **LuminShot 平台抽象** - 跨加载器兼容层
+  - `LuminPlatform` 接口
+  - `PlatformRegistry` 注册机制
+  - `Fabric1210Platform` 实现（现代 GPU API）
+- **环形缓冲区 GPU 管理** - 动态容量扩展
+- **帧缓冲管理** - 渲染目标系统
 
-| 平台 | MC 版本 | 状态 |
-|------|---------|------|
-| Fabric | 1.21.10 | ✅ **Alpha 1** |
-| NeoForge | 1.21.10 | 🔧 开发中 |
-| 其他版本 | - | 🗓 规划中 |
+## 安装
 
----
+### 模组开发者
 
-## 快速接入（下游模组）
+1. 从 [releases](releases/v26.0-alpha.1) 下载 `openlumin-fabric-1.21.10-v26.0-alpha.1.jar`
+2. 添加到模组的 `libs/` 文件夹
+3. 在 `build.gradle.kts` 中添加依赖：
 
-### 1. 添加依赖
-
-**`build.gradle.kts`**：
 ```kotlin
-repositories {
-    maven("https://jitpack.io")
-    // 或 maven("https://github.com/NDBlockConnect/OpenLumin/releases")
-}
-
 dependencies {
-    modImplementation("io.github.openlumin:openlumin-fabric-1.21.10:1.0.0")
+    modImplementation(files("libs/openlumin-fabric-1.21.10-v26.0-alpha.1.jar"))
 }
 ```
 
-**`fabric.mod.json`**：
-```json
-{
-  "depends": {
-    "openlumin": ">=1.0.0"
-  }
-}
-```
+### 测试
 
-### 2. 最简示例
+1. 从 [releases](releases/v26.0-alpha.1) 下载两个 jar 文件：
+   - `openlumin-fabric-1.21.10-v26.0-alpha.1.jar`（库）
+   - `openlumin-testmod-fabric-1.21.10-v26.0-alpha.1.jar`（测试模组）
+2. 将两个文件都放入 Minecraft `mods/` 文件夹
+3. 启动游戏 - 在右上角查看 11 个测试元素
 
-在 `RenderGuiEvent`（Fabric：`HudRenderCallback`）中绘制一个圆角矩形：
+## 快速开始
+
+### 2D 渲染
 
 ```java
-import io.github.openlumin.OpenLumin;
-import io.github.openlumin.LuminRenderSystem;
+import io.github.openlumin.schedulers.render2d.Render2DScheduler;
+import java.awt.Color;
 
-// 在 HUD 渲染回调中：
-LuminRenderSystem.applyOrthoProjection();
-OpenLumin.draw.roundRect(10, 10, 200, 50, 8, new Color(0x44, 0x88, 0xFF));
+// 获取调度器实例
+Render2DScheduler scheduler = new Render2DScheduler();
+var layer = scheduler.layer(0);
+
+// 添加圆角矩形
+layer.addRoundRect(10, 10, 100, 50, 5, Color.WHITE);
+
+// 添加渐变文字
+layer.addGradientText("OpenLumin", 10, 70, 1.0f, 
+    Color.ORANGE, Color.CYAN, fontLoader);
+
+// 刷新到屏幕
+scheduler.flushAndClear();
 ```
 
-更多示例见 [快速上手指南](docs/GETTING_STARTED.md)。
+### 3D 渲染
 
----
+```java
+import io.github.openlumin.schedulers.render3d.Render3DScheduler;
+import net.minecraft.world.phys.AABB;
+
+// 在玩家周围添加轮廓框
+AABB box = player.getBoundingBox();
+Render3DScheduler.INSTANCE.addOutlineBox(box, 0xFFFF0000, 2.0f);
+
+// 添加 RGB 坐标轴
+Vec3 center = player.position();
+Render3DScheduler.INSTANCE.addLine(center, center.add(3, 0, 0), Color.RED, 1.5f);
+```
+
+## 项目结构
+
+```
+OpenLumin/
+├── common/                  # 版本无关核心
+├── fabric-1.21.10/          # Fabric 1.21.10（OpenGL 基线）
+├── fabric-1.21.4/           # Fabric 1.21.4（旧版 OpenGL 参考）
+├── neoforge-1.21.10/        # NeoForge 1.21.10（开发中）
+├── neoforge-1.21.4/         # NeoForge 1.21.4（旧版参考）
+├── openlumin-testmod/       # 测试模组（独立项目）
+└── releases/                # 发布包
+```
+
+## 架构
+
+### LuminShot 平台抽象层
+
+```
+┌─────────────────────────────────────┐
+│  OpenLumin 业务层                    │
+│  (Lumin2D, Lumin3D, Shaders, 等)   │
+└─────────────────────────────────────┘
+                ↓↑
+┌─────────────────────────────────────┐
+│  LuminShot Platform（抽象）         │
+│  - getDevice()                      │
+│  - getDynamicUniforms()             │
+│  - writeTransform()                 │
+│  - resolveColorView/DepthView()     │
+└─────────────────────────────────────┘
+                ↓↑
+┌─────────────────────────────────────┐
+│  平台实现                            │
+│  - Fabric1210Platform (现代 API)    │
+│  - NeoForge1210Platform (开发中)    │
+│  - Fabric1214Platform (旧版 GL)     │
+└─────────────────────────────────────┘
+```
+
+## 版本支持
+
+| Minecraft | Fabric | NeoForge | Forge | 状态 |
+|-----------|--------|----------|-------|--------|
+| 1.21.10   | ✅      | 🔜       | 🔜    | Alpha 1 |
+| 1.21.4    | ✅      | ✅       | 🔜    | 参考 |
+| 26.1      | 🔜     | 🔜       | 🔜    | 计划中 |
+| 26.2      | 🔜     | 🔜       | 🔜    | 计划中 |
+
+## 开发路线图
+
+- **Alpha 1** ✅ - 基础 2D/3D API，平台抽象（Fabric 1.21.10）
+- **Alpha 2** 🔜 - 性能优化（Sodium/Iris 研究）
+- **Alpha 3** 🔜 - 高级光照、实体渲染
+- **Alpha 4** 🔜 - 替代 Sodium/Iris/Optifine
+- **Alpha 5+** 🔜 - v26.0 稳定版
 
 ## 文档
 
-- 📖 [快速上手指南](docs/GETTING_STARTED.md) — 完整接入流程，含代码示例
-- 📚 [API 参考手册](docs/API_REFERENCE.md) — 所有公开 API 的完整说明
-- 📋 [更新日志](CHANGELOG.md)
+- [发布说明](releases/v26.0-alpha.1/RELEASE_NOTES.md)
+- [项目知识库](memory/FACT.md)
+- [API 设计](docs/API_DESIGN.md)
+- [迁移指南](VERSION_MIGRATION.md)
 
----
+## 贡献
+
+欢迎贡献！请提交 issue 和 pull request。
 
 ## 许可证
 
-本项目采用 [GPL-3.0-only](LICENSE) 协议。
-
----
+本项目采用 GPL-3.0-only 协议。详见 [LICENSE](LICENSE)。
 
 ## 致谢
 
-本库从 Epsilon HvH 模组提取，感谢原作者 Chen_Meng 和 06789 的贡献。
+从 Epsilon HvH 模组提取。感谢原作者 Chen_Meng 和 06789。
