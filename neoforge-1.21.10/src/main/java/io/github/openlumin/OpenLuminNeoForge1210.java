@@ -25,12 +25,13 @@ import java.nio.file.Path;
  *
  * 2D 层 (RenderGuiEvent.Post)：
  *   LuminImmediateRenderer / RoundRectRenderer / Render2DScheduler / TtfTextRenderer
- * 3D 层 (RenderLevelStageEvent.AFTER_LEVEL 或 LevelRendererMixin)：
+ * 3D 层 (LevelRendererMixin)：
  *   Render3DScheduler — 玩家轮廓框 + 填充半透明盒 + 坐标轴
  *
- * 帧生命周期由钩子统一管理：
- *   HUD 开始 → beginRenderFrame()
- *   HUD 结束 (finally) → endDynamicUniformFrame()  ← 确保每帧重置 UBO 写入指针
+ * 帧生命周期由 RenderSystemMixin 统一管理：
+ *   flipFrame 后 → LuminImmediateRenderer.endFrame()
+ *               → LuminRenderSystem.endDynamicUniformFrame()
+ *               → LuminRenderSystem.beginRenderFrame()
  */
 @Mod(value = "openlumin", dist = Dist.CLIENT)
 public class OpenLuminNeoForge1210 {
@@ -76,21 +77,15 @@ public class OpenLuminNeoForge1210 {
 
         /**
          * 2D HUD 渲染钩子（RenderGuiEvent.Post 在所有 GUI 层渲染之后触发）
-         * beginRenderFrame / endDynamicUniformFrame 在此统一管理，
-         * 业务层（Renderer / Scheduler）无需关心帧生命周期。
          */
         @SubscribeEvent
         public void onRenderGui(RenderGuiEvent.Post event) {
-            LuminRenderSystem.beginRenderFrame();
             try {
                 Minecraft mc = Minecraft.getInstance();
                 render2D(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
             } catch (Throwable e) {
                 System.err.println("[OpenLumin] 2D render error: " + e);
                 e.printStackTrace();
-            } finally {
-                // 重置所有 DynamicUniformStorage 写入指针，下帧复用槽位
-                LuminRenderSystem.endDynamicUniformFrame();
             }
         }
 

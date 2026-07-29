@@ -17,8 +17,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * 注入 LevelRenderer.renderLevel() 末尾，在所有世界内容渲染完毕后
  * 执行 Render3DScheduler（轮廓框、填充盒、坐标轴等3D图元）。
  *
- * 1.21.10 的 renderLevel 已不含 PoseStack 参数，因此 Render3DScheduler.flush()
- * 内部通过 RenderSystem.getModelViewMatrix() 自行获取变换矩阵。
+ * 1.21.10 的 renderLevel 已不含 PoseStack 参数，因此将本次世界渲染使用的
+ * modelViewMatrix 与相机位置显式传给 Render3DScheduler，避免 RETURN 时读取到已恢复的 HUD 矩阵。
  */
 @Mixin(LevelRenderer.class)
 public abstract class LevelRendererMixin {
@@ -38,7 +38,7 @@ public abstract class LevelRendererMixin {
             CallbackInfo ci
     ) {
         if (!Render3DScheduler.INSTANCE.isEmpty()) {
-            Render3DScheduler.INSTANCE.flush();
+            Render3DScheduler.INSTANCE.flush(modelViewMatrix, camera.getPosition());
         }
     }
 }
