@@ -16,6 +16,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer;
 import net.minecraft.client.renderer.DynamicUniformStorage;
+import net.minecraft.client.renderer.DynamicUniforms;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.*;
 
@@ -211,8 +212,28 @@ public class LuminRenderSystem {
      * 1.21.10：writeTransform 第5参数 lineWidth=1.0f（原生 API 新增）。
      */
     public static GpuBufferSlice writeTransform(Matrix4fc modelView, Vector4fc colorModulator, Vector3fc modelOffset, Matrix4fc textureMatrix) {
-        return RenderSystemExtensions.getDynamicUniforms().writeTransform(
-                modelView, colorModulator, modelOffset, textureMatrix, 1.0f
+        return writeTransform(modelView, colorModulator, modelOffset, textureMatrix, 1.0f);
+    }
+
+    public static GpuBufferSlice writeTransform(
+            Matrix4fc modelView,
+            Vector4fc colorModulator,
+            Vector3fc modelOffset,
+            Matrix4fc textureMatrix,
+            float lineWidth
+    ) {
+        return writeDynamicUniform(
+                "dynamic_transforms",
+                "Lumin Dynamic Transforms UBO",
+                DynamicUniforms.TRANSFORM_UBO_SIZE,
+                64,
+                new DynamicUniforms.Transform(
+                        new Matrix4f(modelView),
+                        new Vector4f(colorModulator),
+                        new Vector3f(modelOffset),
+                        new Matrix4f(textureMatrix),
+                        lineWidth
+                )
         );
     }
 

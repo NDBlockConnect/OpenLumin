@@ -279,7 +279,7 @@ public final class LuminImmediateRenderer {
                     return;
                 }
 
-                GpuBufferSlice dynamicUniforms = RenderSystemExtensions.getDynamicUniforms().writeTransform(
+                GpuBufferSlice dynamicUniforms = LuminRenderSystem.writeTransform(
                         this.dynamicModelView,
                         new Vector4f(1, 1, 1, 1),
                         new Vector3f(0, 0, 0),
