@@ -37,8 +37,6 @@ public abstract class LevelRendererMixin {
             boolean isFoggy,
             CallbackInfo ci
     ) {
-        if (!Render3DScheduler.INSTANCE.isEmpty()) {
-            Render3DScheduler.INSTANCE.flush(modelViewMatrix, camera.getPosition());
-        }
+        Render3DScheduler.INSTANCE.flush(modelViewMatrix, camera.getPosition());
     }
 }

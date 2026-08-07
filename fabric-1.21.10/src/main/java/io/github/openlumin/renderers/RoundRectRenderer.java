@@ -9,7 +9,7 @@ import io.github.openlumin.utils.render.ScissorUtils;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import io.github.openlumin.compat.RenderSystemShim;
 import net.minecraft.util.ARGB;
 import org.lwjgl.system.MemoryUtil;
 
@@ -112,7 +112,7 @@ public class RoundRectRenderer implements IRenderer {
         if (info == null || info.colorView() == null) return;
         if (scissorEnabled && !ScissorUtils.isVisible(scissorW, scissorH)) return;
 
-        try (RenderPass pass = RenderSystemExtensions.getDevice().createCommandEncoder().createRenderPass(
+        try (RenderPass pass = RenderSystemShim.getDevice().createCommandEncoder().createRenderPass(
                 () -> "Round Rect Draw", info.colorView(), OptionalInt.empty(),
                 info.depthView(), OptionalDouble.empty())
         ) {

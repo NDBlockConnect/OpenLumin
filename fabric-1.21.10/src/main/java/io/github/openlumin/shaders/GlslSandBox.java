@@ -8,7 +8,7 @@ import com.mojang.blaze3d.buffers.Std140SizeCalculator;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import io.github.openlumin.compat.RenderSystemShim;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import net.minecraft.client.renderer.DynamicUniformStorage;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -91,7 +91,7 @@ public class GlslSandBox implements AutoCloseable {
                 new SandboxInfo(targetWidth, targetHeight, elapsedTime, mouseUvX, mouseUvY, mousePxX, mousePxY)
         );
 
-        final var encoder = RenderSystemExtensions.getDevice().createCommandEncoder();
+        final var encoder = RenderSystemShim.getDevice().createCommandEncoder();
         try (RenderPass pass = encoder.createRenderPass(
                 () -> "Lumin GLSL Sandbox",
                 colorView, OptionalInt.empty(),

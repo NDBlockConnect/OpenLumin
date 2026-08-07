@@ -2,7 +2,7 @@ package io.github.openlumin.text.ttf;
 
 import io.github.openlumin.LuminTexture;
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import io.github.openlumin.compat.RenderSystemShim;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.TextureFormat;
 import net.minecraft.client.Minecraft;
@@ -34,7 +34,7 @@ public class TtfGlyphAtlas {
     public TtfGlyphAtlas(int atlasId) {
         this.textureId = ResourceLocation.fromNamespaceAndPath("epsilon", "ttf_atlas/" + NEXT_TEXTURE_ID.getAndIncrement());
 
-        final var device = RenderSystemExtensions.getDevice();
+        final var device = RenderSystemShim.getDevice();
 
         final var tex = device.createTexture(
                 () -> "Lumin-TtfGlyphAtlas",
@@ -55,7 +55,7 @@ public class TtfGlyphAtlas {
         ByteBuffer transparent = MemoryUtil.memAlloc(SIZE * SIZE);
         try {
             MemoryUtil.memSet(MemoryUtil.memAddress(transparent), 0xFF, SIZE * SIZE);
-            RenderSystemExtensions.getDevice().createCommandEncoder().writeToTexture(
+            RenderSystemShim.getDevice().createCommandEncoder().writeToTexture(
                     texture,
                     transparent,
                     NativeImage.Format.LUMINANCE,
@@ -93,7 +93,7 @@ public class TtfGlyphAtlas {
         int glyphX = currentX + GLYPH_GUTTER;
         int glyphY = currentY + GLYPH_GUTTER;
 
-        RenderSystemExtensions.getDevice().createCommandEncoder().writeToTexture(
+        RenderSystemShim.getDevice().createCommandEncoder().writeToTexture(
                 this.texture.getTexture(),
                 glyph.glyphData(),
                 NativeImage.Format.LUMINANCE,

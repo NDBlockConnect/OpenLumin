@@ -29,6 +29,8 @@ public final class Render3DScheduler {
 
     public static final Render3DScheduler INSTANCE = new Render3DScheduler();
 
+    private static final Matrix4f IDENTITY_MATRIX = new Matrix4f();
+
     private static final RenderPipeline FILLED_BOX_PIPELINE = RenderPipeline.builder(LuminRenderPipelines.BASE_SNIPPET)
             .withLocation(ResourceLocation.fromNamespaceAndPath("openlumin","pipeline/filled_box"))
             .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
@@ -159,7 +161,8 @@ public final class Render3DScheduler {
             return;
         }
 
-        for (BlurredBoxCommand command : blurredBoxes) {
+        for (int i = 0; i < blurredBoxes.size(); i++) {
+            BlurredBoxCommand command = blurredBoxes.get(i);
             BlurShader.INSTANCE.render3DBox(command.box(), command.blurStrength());
         }
     }
@@ -171,14 +174,13 @@ public final class Render3DScheduler {
 
         LuminImmediateRenderer.PosColorQuads builder =
                 LuminImmediateRenderer.beginPosColorQuads(FILLED_BOX_PIPELINE, modelViewMatrix);
-        Matrix4f identity = new Matrix4f();
 
         for (FilledBoxCommand command : filledBoxes) {
-            emitFilledBox(builder, identity, cameraPosition, command);
+            emitFilledBox(builder, IDENTITY_MATRIX, cameraPosition, command);
         }
 
         for (FilledSideCommand command : filledSides) {
-            emitFilledSide(builder, identity, cameraPosition, command);
+            emitFilledSide(builder, IDENTITY_MATRIX, cameraPosition, command);
         }
 
         builder.end();
@@ -193,23 +195,32 @@ public final class Render3DScheduler {
         PoseStack.Pose identityPose = identityStack.last();
         Matrix4f identity = identityPose.pose();
 
+        float maxThickness = 1.0f;
+        for (OutlineBoxCommand cmd : outlineBoxes) {
+            maxThickness = Math.max(maxThickness, cmd.thickness());
+        }
+        for (SideOutlineCommand cmd : sideOutlines) {
+            maxThickness = Math.max(maxThickness, cmd.thickness());
+        }
+        for (LineCommand cmd : lines) {
+            maxThickness = Math.max(maxThickness, cmd.thickness());
+        }
+
+        LuminImmediateRenderer.Lines builder = LuminImmediateRenderer.beginLines(LINES_PIPELINE, modelViewMatrix, maxThickness);
+
         for (OutlineBoxCommand command : outlineBoxes) {
-            LuminImmediateRenderer.Lines builder = LuminImmediateRenderer.beginLines(LINES_PIPELINE, modelViewMatrix, command.thickness());
-            emitOutlineBox(builder, identity, identityPose, cameraPosition, command);
-            builder.end();
+            emitOutlineBox(builder, IDENTITY_MATRIX, identityPose, cameraPosition, command);
         }
 
         for (SideOutlineCommand command : sideOutlines) {
-            LuminImmediateRenderer.Lines builder = LuminImmediateRenderer.beginLines(LINES_PIPELINE, modelViewMatrix, command.thickness());
-            emitSideOutline(builder, identity, identityPose, cameraPosition, command);
-            builder.end();
+            emitSideOutline(builder, IDENTITY_MATRIX, identityPose, cameraPosition, command);
         }
 
         for (LineCommand command : lines) {
-            LuminImmediateRenderer.Lines builder = LuminImmediateRenderer.beginLines(LINES_PIPELINE, modelViewMatrix, command.thickness());
-            emitLine(builder, identity, identityPose, cameraPosition, command);
-            builder.end();
+            emitLine(builder, IDENTITY_MATRIX, identityPose, cameraPosition, command);
         }
+
+        builder.end();
     }
 
     private void emitFilledBox(LuminImmediateRenderer.PosColorQuads builder, Matrix4f matrix, Vec3 camPos, FilledBoxCommand command) {

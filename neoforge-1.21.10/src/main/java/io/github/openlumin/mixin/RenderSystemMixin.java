@@ -24,6 +24,5 @@ public abstract class RenderSystemMixin {
     private static void onFrameEnd(Window window, TracyFrameCapture frameCapture, CallbackInfo ci) {
         LuminImmediateRenderer.endFrame();
         LuminRenderSystem.endDynamicUniformFrame();
-        LuminRenderSystem.beginRenderFrame();
     }
 }

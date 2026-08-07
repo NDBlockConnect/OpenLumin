@@ -12,9 +12,9 @@ import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import io.github.openlumin.compat.RenderSystemShim;
 import com.mojang.blaze3d.textures.GpuTextureView;
-import io.github.openlumin.text.minecraft.ClientSetting;
+// ClientSetting 在 fabric-1.21.10 中不存在，使用硬编码默认值
 import net.minecraft.util.ARGB;
 import org.lwjgl.system.MemoryUtil;
 
@@ -311,19 +311,16 @@ public class TtfTextRenderer implements ITextRenderer {
 
         GpuBufferSlice dynamicUniforms = LuminRenderSystem.writeDefaultGuiTransform();
         GpuBuffer ibo = LuminRenderSystem.getQuadIndexBuffer(maxIndexCount);
-        try (RenderPass pass = RenderSystemExtensions.getDevice().createCommandEncoder().createRenderPass(
+        try (RenderPass pass = RenderSystemShim.getDevice().createCommandEncoder().createRenderPass(
                 () -> "Lumin TTF Draws",
                 colorView, OptionalInt.empty(),
                 depthView, OptionalDouble.empty())
         ) {
-            pass.setPipeline(ClientSetting.INSTANCE.fontAntiAliasing.getValue()
-                    ? LuminRenderPipelines.TTF_FONT_AA
-                    : LuminRenderPipelines.TTF_FONT_NO_AA);
+            pass.setPipeline(LuminRenderPipelines.TTF_FONT_AA);
             if (scissorEnabled) {
                 ScissorUtils.enableScissor(pass, scissorX, scissorY, scissorW, scissorH);
             }
 
-            // TODO: RenderSystem.bindDefaultUniforms not available in NeoForge 1.21.4
             pass.setUniform("DynamicTransforms", dynamicUniforms);
             pass.setIndexBuffer(ibo, LuminRenderSystem.getQuadIndexType());
 

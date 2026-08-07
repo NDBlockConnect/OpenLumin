@@ -8,7 +8,7 @@ import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import io.github.openlumin.compat.RenderSystemShim;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -285,7 +285,7 @@ public final class LuminImmediateRenderer {
                         this.lineWidth
                 );
 
-                try (RenderPass pass = RenderSystemExtensions.getDevice().createCommandEncoder().createRenderPass(
+                try (RenderPass pass = RenderSystemShim.getDevice().createCommandEncoder().createRenderPass(
                         () -> "Lumin Immediate Draw",
                         colorView, OptionalInt.empty(),
                         depthView, OptionalDouble.empty())

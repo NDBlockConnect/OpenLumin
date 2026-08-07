@@ -7,7 +7,7 @@ import io.github.openlumin.text.ttf.TtfGlyphAtlas;
 
 import com.mojang.blaze3d.font.GlyphInfo;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.GpuSampler;
+import io.github.openlumin.compat.GpuSamplerShim;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.gui.Font;
@@ -190,16 +190,14 @@ public final class EpsilonFontGlyph implements BakedGlyph {
         }
 
         // epsilon$sampler() — 1.21.10 GpuSampler 已移除，仅保留兼容性
-        public GpuSampler epsilon$sampler() {
+        public GpuSamplerShim epsilon$sampler() {
             // 1.21.10: GpuSampler 已移除，返回 null
             return null;
         }
 
         // Fabric专属方法
         public RenderPipeline guiPipeline() {
-            return ClientSetting.INSTANCE.fontAntiAliasing.getValue()
-                    ? LuminRenderPipelines.TTF_FONT_AA
-                    : LuminRenderPipelines.TTF_FONT_NO_AA;
+            return LuminRenderPipelines.TTF_FONT_AA;
         }
 
         // Fabric专属方法
@@ -225,7 +223,7 @@ public final class EpsilonFontGlyph implements BakedGlyph {
         public float getShadowOffset() { return SHADOW_OFFSET; }
 
         // bake() — 参数类型可能已变更，去掉 @Override 以确保编译
-        public BakedGlyph bake(Function<com.mojang.blaze3d.font.SheetGlyphInfo, BakedGlyph> function) {
+        public BakedGlyph bake(Function<io.github.openlumin.compat.SheetGlyphInfoShim, BakedGlyph> function) {
             return null;
         }
     }

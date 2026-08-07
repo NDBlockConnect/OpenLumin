@@ -3,7 +3,7 @@ package io.github.openlumin.buffer;
 import io.github.openlumin.LuminRenderSystem;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.systems.CommandEncoder;
-import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import io.github.openlumin.compat.RenderSystemShim;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -57,7 +57,7 @@ public class LuminRingBuffer {
     public void tryMap() {
         if (mapped) return;
         beginFrameIfNeeded();
-        mappedBuffer = RenderSystemExtensions.getDevice().createCommandEncoder().mapBuffer(getGpuBuffer(), false, true);
+        mappedBuffer = RenderSystemShim.getDevice().createCommandEncoder().mapBuffer(getGpuBuffer(), false, true);
         mapped = true;
     }
 
@@ -122,7 +122,7 @@ public class LuminRingBuffer {
                 MemoryUtil.memFree(preservedMappedData);
             }
         } else if (preservedBytes > 0) {
-            RenderSystemExtensions.getDevice()
+            RenderSystemShim.getDevice()
                     .createCommandEncoder()
                     .copyToBuffer(oldBuffer.slice(0, preservedBytes), nextBuffer.slice(0, preservedBytes));
         }
@@ -157,6 +157,6 @@ public class LuminRingBuffer {
     }
 
     private GpuBuffer createBuffer(int index, int size) {
-        return RenderSystemExtensions.getDevice().createBuffer(() -> "lumin-ring-buffer #" + index, usage, size);
+        return RenderSystemShim.getDevice().createBuffer(() -> "lumin-ring-buffer #" + index, usage, size);
     }
 }

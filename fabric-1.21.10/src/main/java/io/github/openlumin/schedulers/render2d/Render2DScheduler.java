@@ -9,7 +9,7 @@ import io.github.openlumin.text.ttf.TtfFontLoader;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import io.github.openlumin.compat.RenderSystemShim;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -180,7 +180,7 @@ public final class Render2DScheduler implements AutoCloseable {
         }
 
         GpuTextureView depthView = pipeline == LuminRenderPipelines.TEXTURE ? null : LuminRenderSystem.resolveDepthView();
-        try (RenderPass pass = RenderSystemExtensions.getDevice().createCommandEncoder().createRenderPass(
+        try (RenderPass pass = RenderSystemShim.getDevice().createCommandEncoder().createRenderPass(
                 () -> "Lumin 2D Pipeline Run",
                 colorView, OptionalInt.empty(),
                 depthView, OptionalDouble.empty())

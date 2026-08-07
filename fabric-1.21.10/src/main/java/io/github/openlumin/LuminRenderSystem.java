@@ -9,7 +9,7 @@ import com.mojang.blaze3d.ProjectionType;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import io.github.openlumin.compat.RenderSystemShim;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
@@ -68,9 +68,6 @@ public class LuminRenderSystem {
 
     public static void endDynamicUniformFrame() {
         ShaderUniforms.endFrame();
-    }
-
-    public static void beginRenderFrame() {
         renderFrameId++;
     }
 
@@ -325,7 +322,7 @@ public class LuminRenderSystem {
 
         private void createTextures() {
             closed = false;
-            var device = RenderSystemExtensions.getDevice();
+            var device = RenderSystemShim.getDevice();
 
             final var colorTex = device.createTexture(
                     "lumin-rt-color",
@@ -363,7 +360,7 @@ public class LuminRenderSystem {
         }
 
         public void clear() {
-            var encoder = RenderSystemExtensions.getDevice().createCommandEncoder();
+            var encoder = RenderSystemShim.getDevice().createCommandEncoder();
             if (useDepth) {
                 encoder.clearColorAndDepthTextures(colorTexture.getTexture(), 0, depthTexture, 1.0);
             } else {

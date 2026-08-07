@@ -5,7 +5,7 @@
 **OpenLumin** 是专为 Minecraft Java Edition 模组设计的高性能 2D/3D 渲染库。  
 最初从 Epsilon HvH 客户端（NekoyaHouse）中提取，现作为独立库维护，为任意模组提供统一、跨版本的渲染 API。
 
-> **🎉 v26.0 Alpha 1 已发布！** — Fabric 1.21.10 版本现已提供平台抽象层支持。  
+> **v26.0 Alpha 1 正在开发。** Fabric 1.21.10 与 NeoForge 1.21.10 均已通过完整的 2D/3D 运行验证。
 > [下载](releases/v26.0-alpha.1) | [发布说明](releases/v26.0-alpha.1/RELEASE_NOTES.md) | [测试结果](memory/FACT.md#架构重构完整完成)
 
 ## 特性
@@ -34,7 +34,7 @@
 - **LuminShot 平台抽象** - 跨加载器兼容层
   - `LuminPlatform` 接口
   - `PlatformRegistry` 注册机制
-  - `Fabric1210Platform` 实现（现代 GPU API）
+  - Fabric 与 NeoForge 1.21.10 平台实现（现代 GPU API）
 - **环形缓冲区 GPU 管理** - 动态容量扩展
 - **帧缓冲管理** - 渲染目标系统
 
@@ -102,10 +102,11 @@ Render3DScheduler.INSTANCE.addLine(center, center.add(3, 0, 0), Color.RED, 1.5f)
 
 ```
 OpenLumin/
-├── common/                  # 版本无关核心
-├── fabric-1.21.10/          # Fabric 1.21.10（OpenGL 基线）
+├── fabric-1.21.10/          # 1.21.10 OpenGL 业务代码基底
+├── fabric-26.1.2/           # Fabric 26.1.2 移植基底（加载器骨架已通过构建）
 ├── fabric-1.21.4/           # Fabric 1.21.4（旧版 OpenGL 参考）
-├── neoforge-1.21.10/        # NeoForge 1.21.10（开发中）
+├── neoforge-1.21.10/        # 复用 1.21.10 基底的 NeoForge 适配层
+├── neoforge-26.1.2/         # NeoForge 26.1.2 适配层（加载器骨架已通过构建）
 ├── neoforge-1.21.4/         # NeoForge 1.21.4（旧版参考）
 ├── openlumin-testmod/       # 测试模组（独立项目）
 └── releases/                # 发布包
@@ -132,23 +133,25 @@ OpenLumin/
 ┌─────────────────────────────────────┐
 │  平台实现                            │
 │  - Fabric1210Platform (现代 API)    │
-│  - NeoForge1210Platform (开发中)    │
+│  - NeoForge1210Platform (现代 API)  │
 │  - Fabric1214Platform (旧版 GL)     │
 └─────────────────────────────────────┘
 ```
 
 ## 版本支持
 
-| Minecraft | Fabric | NeoForge | Forge | 状态 |
-|-----------|--------|----------|-------|--------|
-| 1.21.10   | ✅      | 🔜       | 🔜    | Alpha 1 |
-| 1.21.4    | ✅      | ✅       | 🔜    | 参考 |
-| 26.1      | 🔜     | 🔜       | 🔜    | 计划中 |
-| 26.2      | 🔜     | 🔜       | 🔜    | 计划中 |
+| Minecraft | Fabric | NeoForge | 状态 |
+|-----------|--------|----------|--------|
+| 1.21.10   | ✅      | ✅        | Alpha 1 已完成 |
+| 1.21.4    | ✅      | ✅        | 参考 |
+| 26.1.2    | 🔄      | 🔄        | 构建骨架已验证，渲染移植进行中 |
+| 26.2      | 🔜      | 🔜        | Alpha 1 计划中 |
+
+Minecraft 1.21.x 及以上版本不支持 Forge；OpenLumin 的现代产品线集中维护 Fabric 与 NeoForge。
 
 ## 开发路线图
 
-- **Alpha 1** ✅ - 基础 2D/3D API，平台抽象（Fabric 1.21.10）
+- **Alpha 1** 🔄 - 在 Fabric 与 NeoForge 上支持 1.21.10、26.1.2、26.2 的基础 LuminGraphics API
 - **Alpha 2** 🔜 - 性能优化（Sodium/Iris 研究）
 - **Alpha 3** 🔜 - 高级光照、实体渲染
 - **Alpha 4** 🔜 - 替代 Sodium/Iris/Optifine

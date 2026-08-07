@@ -1,0 +1,31 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "MIT"
+
+[[mods]]
+modId = "openlumin_testmod"
+version = "${version}"
+displayName = "OpenLumin Test Mod"
+description = "Test cases for OpenLumin rendering library"
+authors = "OpenLumin Team"
+
+[[dependencies.openlumin_testmod]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.10,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.openlumin_testmod]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.10,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.openlumin_testmod]]
+modId = "openlumin"
+type = "required"
+versionRange = "[1.0.0,)"
+ordering = "AFTER"
+side = "CLIENT"

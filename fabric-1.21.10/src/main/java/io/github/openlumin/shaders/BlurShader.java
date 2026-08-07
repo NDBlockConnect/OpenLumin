@@ -14,7 +14,7 @@ import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import io.github.openlumin.compat.RenderSystemShim;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.*;
@@ -138,7 +138,7 @@ public class BlurShader {
 
         float quality = Math.max(0.0f, blurStrength);
 
-        CommandEncoder encoder = RenderSystemExtensions.getDevice().createCommandEncoder();
+        CommandEncoder encoder = RenderSystemShim.getDevice().createCommandEncoder();
         encoder.copyTextureToTexture(
                 targetTexture,
                 input.getColorTexture(),
@@ -189,7 +189,7 @@ public class BlurShader {
 
         if (this.input.getColorTexture() == null || this.input.getColorTextureView() == null) return;
 
-        CommandEncoder encoder = RenderSystemExtensions.getDevice().createCommandEncoder();
+        CommandEncoder encoder = RenderSystemShim.getDevice().createCommandEncoder();
         encoder.copyTextureToTexture(
                 fb.getColorTexture(),
                 input.getColorTexture(),
@@ -210,7 +210,7 @@ public class BlurShader {
         addBoxVertices(buffer, box);
         MeshData mesh = buffer.buildOrThrow();
 
-        GpuBuffer vertices = RenderSystemExtensions.getDevice().createBuffer(
+        GpuBuffer vertices = RenderSystemShim.getDevice().createBuffer(
                 () -> "BlurShader vertices", GpuBuffer.USAGE_VERTEX, mesh.vertexBuffer().remaining());
         // 1.21.10: RenderSystem.getSequentialBuffer() 替代 new AutoStorageIndexBuffer(mode)
         var autoIndices = RenderSystem.getSequentialBuffer(mesh.drawState().mode());

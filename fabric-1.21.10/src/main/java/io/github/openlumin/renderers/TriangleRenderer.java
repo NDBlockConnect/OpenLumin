@@ -9,7 +9,7 @@ import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import io.github.openlumin.compat.RenderSystemShim;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import net.minecraft.util.ARGB;
 import org.joml.Matrix4f;
@@ -126,7 +126,7 @@ public class TriangleRenderer implements IRenderer {
                 new Vector3f(0, 0, 0),
                 new Matrix4f()
         );
-        try (RenderPass pass = RenderSystemExtensions.getDevice().createCommandEncoder().createRenderPass(
+        try (RenderPass pass = RenderSystemShim.getDevice().createCommandEncoder().createRenderPass(
                 () -> "Triangle Draw", colorView, OptionalInt.empty(), depthView, OptionalDouble.empty())) {
             pass.setPipeline(LuminRenderPipelines.TRIANGLE);
             if (scissorEnabled) ScissorUtils.enableScissor(pass, scissorX, scissorY, scissorW, scissorH);

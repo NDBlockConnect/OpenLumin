@@ -9,7 +9,7 @@ OpenLumin v26.0 Alpha 1 是项目的首个公开测试版本，包含基础的 2
 ## 支持版本
 
 - ✅ **Minecraft 1.21.10 + Fabric Loader 0.16.9+**（当前发布）
-- 🔜 Minecraft 1.21.10 + NeoForge（下一步）
+- ✅ **Minecraft 1.21.10 + NeoForge 21.10.64**（PreRelease 已提供，2D/3D 运行验证通过）
 - 🔜 其他版本（后续 Alpha 版本）
 
 ## 新增功能
@@ -48,6 +48,7 @@ OpenLumin v26.0 Alpha 1 是项目的首个公开测试版本，包含基础的 2
   - `LuminPlatform` 接口定义
   - `PlatformRegistry` 注册机制
   - `Fabric1210Platform` 实现（现代 GPU API）
+  - `NeoForge1210Platform` 实现（现代 GPU API）
 - ✅ **测试与库分离** - `openlumin-testmod` 独立测试模组
 - ✅ **项目结构优化** - 主分支只保留 4 个活跃版本
 
@@ -86,7 +87,8 @@ OpenLumin v26.0 Alpha 1 是项目的首个公开测试版本，包含基础的 2
 
 ## 已知问题
 
-- ⚠️ 仅支持 Fabric 1.21.10，其他加载器和版本尚未完成
+- ⚠️ 当前已完成 Fabric/NeoForge 1.21.10，26.1.2/26.2 系列仍在适配
+- ⚠️ Minecraft 1.21.x 及以上不提供 Forge 版本
 - ⚠️ 部分 Shader 功能（3D box blur）未实现
 - ⚠️ 字体渲染需要手动指定 TTF 文件路径
 
@@ -95,8 +97,8 @@ OpenLumin v26.0 Alpha 1 是项目的首个公开测试版本，包含基础的 2
 ### 架构重构
 - **Phase 1**: 创建 LuminShot Platform 抽象层 ✅
 - **Phase 2**: 重构业务层使用抽象接口 ✅
-- **Phase 3**: 扩展到 NeoForge 1.21.10 🔜
-- **Phase 4**: 推广到全部 9 个平台 🔜
+- **Phase 3**: 扩展到 NeoForge 1.21.10 ✅
+- **Phase 4**: 推广到 26.1.2/26.2 的 Fabric 与 NeoForge，共 6 个 Alpha 1 目标 🔜
 
 ### 渲染验证
 - ✅ 平台抽象层运行时验证通过
@@ -108,12 +110,11 @@ OpenLumin v26.0 Alpha 1 是项目的首个公开测试版本，包含基础的 2
 - Shader 预编译缓存
 - 批量渲染优化
 
-## 下一步计划（Alpha 2）
+## 下一步计划（Alpha 1）
 
-1. **NeoForge 1.21.10 支持**
-2. **性能优化研究**（参考 Sodium、Iris）
-3. **更多渲染机制支持**
-4. **文档完善**
+1. **Fabric/NeoForge 26.1.2 支持**
+2. **Fabric/NeoForge 26.2 支持**
+3. **完成六个平台目标后进入 Alpha 2 性能研究**
 
 ## 反馈与支持
 

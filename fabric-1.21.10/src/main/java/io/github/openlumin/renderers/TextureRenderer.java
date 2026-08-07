@@ -11,7 +11,7 @@ import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import io.github.openlumin.compat.RenderSystemShim;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
@@ -36,7 +36,7 @@ import net.minecraft.client.Minecraft;
  * - createSampler() 已移除
  * - bindTexture(name, view, sampler) → bindSampler(name, view)
  * - LuminTexture 不再携带 GpuSampler
- * - AbstractTextureExtensions.getTextureView() → AbstractTexture.getColorTextureView()
+ * - AbstractTextureShim.getTextureView() → AbstractTexture.getColorTextureView()
  * - TextureFormat → textures.TextureFormat
  */
 public class TextureRenderer implements IRenderer {
@@ -182,7 +182,7 @@ public class TextureRenderer implements IRenderer {
 
         GpuBufferSlice dynamicUniforms = LuminRenderSystem.writeDefaultGuiTransform();
         GpuBuffer ibo = LuminRenderSystem.getQuadIndexBuffer(maxIndexCount);
-        try (RenderPass pass = RenderSystemExtensions.getDevice().createCommandEncoder().createRenderPass(
+        try (RenderPass pass = RenderSystemShim.getDevice().createCommandEncoder().createRenderPass(
                 () -> "Rounded Texture Draws",
                 colorView, OptionalInt.empty(), null, OptionalDouble.empty())
         ) {
@@ -280,7 +280,7 @@ public class TextureRenderer implements IRenderer {
             image = MissingTextureAtlasSprite.generateMissingImage();
         }
 
-        var device = RenderSystemExtensions.getDevice();
+        var device = RenderSystemShim.getDevice();
         GpuTexture texture = device.createTexture(
                 id.toString(),
                 GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING,

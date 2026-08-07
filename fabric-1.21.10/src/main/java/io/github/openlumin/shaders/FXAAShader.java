@@ -11,7 +11,7 @@ import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import io.github.openlumin.compat.RenderSystemShim;
 import net.minecraft.client.renderer.DynamicUniformStorage;
 import net.minecraft.client.renderer.RenderPipelines;
 
@@ -84,7 +84,7 @@ public class FXAAShader {
             return;
         }
 
-        CommandEncoder encoder = RenderSystemExtensions.getDevice().createCommandEncoder();
+        CommandEncoder encoder = RenderSystemShim.getDevice().createCommandEncoder();
         encoder.copyTextureToTexture(
                 framebuffer.getColorTexture(),
                 this.input.getColorTexture(),

@@ -10,7 +10,7 @@ object Versions {
     object Minecraft {
         // 2026.x 新版本体系
         const val V26_2 = "26.2"
-        const val V26_1 = "26.1"
+        const val V26_1 = "26.1.2"
 
         // 1.21.x
         const val V1_21_10 = "1.21.10"
@@ -52,7 +52,7 @@ object Versions {
     // NeoForge 版本映射
     object NeoForge {
         const val V26_2 = "26.2.0"
-        const val V26_1 = "26.1.0"
+        const val V26_1 = "26.1.2.94"
         const val V1_21_10 = "21.10.0"
         const val V1_21_4 = "21.4.27-beta"
         const val V1_21_3 = "21.3.0-beta"
@@ -66,7 +66,8 @@ object Versions {
 
     // Fabric 版本映射
     object Fabric {
-        const val LOADER = "0.15.11"
+        const val LOADER = "0.19.3"
+        const val API_26_1 = "0.155.2+26.1.2"
         const val API_1_21 = "0.100.0+1.21"
         const val API_1_20 = "0.92.2+1.20.1"
         const val API_1_19 = "0.76.0+1.19.2"
@@ -76,29 +77,7 @@ object Versions {
         const val API_1_15 = "0.28.5+1.15"
         const val API_1_14 = "0.28.5+1.14"
         const val API_1_13 = "0.28.5+1.13"
-        const val LOOM = "1.7-SNAPSHOT"
-    }
-
-    // Forge 版本映射
-    object Forge {
-        const val V1_21_4 = "1.21.4-54.0.27"
-        const val V1_21_3 = "1.21.3-54.0.0"
-        const val V1_21_1 = "1.21.1-52.0.0"
-        const val V1_20_6 = "1.20.6-50.1.0"
-        const val V1_20_5 = "1.20.5-50.0.0"
-        const val V1_20_4 = "1.20.4-49.0.50"
-        const val V1_20_2 = "1.20.2-48.1.0"
-        const val V1_20_1 = "1.20.1-47.3.0"
-        const val V1_19_4 = "1.19.4-45.2.0"
-        const val V1_19_3 = "1.19.3-44.1.23"
-        const val V1_19_2 = "1.19.2-43.3.13"
-        const val V1_18_2 = "1.18.2-40.2.0"
-        const val V1_17_1 = "1.17.1-37.1.1"
-        const val V1_16_5 = "1.16.5-36.2.39"
-        const val V1_15_2 = "1.15.2-31.2.57"
-        const val V1_14_4 = "1.14.4-28.2.26"
-        const val V1_13_2 = "1.13.2-25.0.223"
-        const val GRADLE_PLUGIN = "6.0.24"
+        const val LOOM = "1.17.17"
     }
 
     // 依赖库版本

@@ -2,7 +2,7 @@ package io.github.openlumin.text;
 
 import io.github.openlumin.LuminTexture;
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.RenderSystemExtensions;
+import io.github.openlumin.compat.RenderSystemShim;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
@@ -142,7 +142,7 @@ public final class SystemEmojiAtlas implements AutoCloseable {
     private void uploadAtlas() {
         try (NativeImage image = toNativeImage(atlasImage)) {
             if (texture == null) {
-                var device = RenderSystemExtensions.getDevice();
+                var device = RenderSystemShim.getDevice();
                 // 1.21.10: textures.GpuTexture — no GpuSampler, 2-arg LuminTexture
                 GpuTexture gpuTexture = device.createTexture(
                         () -> "epsilon/system_emoji_atlas",
@@ -156,7 +156,7 @@ public final class SystemEmojiAtlas implements AutoCloseable {
                 GpuTextureView view = device.createTextureView(gpuTexture);
                 texture = new LuminTexture(gpuTexture, view);
             }
-            RenderSystemExtensions.getDevice().createCommandEncoder().writeToTexture(texture.getTexture(), image);
+            RenderSystemShim.getDevice().createCommandEncoder().writeToTexture(texture.getTexture(), image);
         }
     }
 

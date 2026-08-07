@@ -5,7 +5,7 @@
 **OpenLumin** is a high-performance 2D/3D rendering library for Minecraft Java Edition mods.  
 Originally extracted from the Epsilon HvH client (NekoyaHouse), now maintained as a standalone library to provide a unified, version-agnostic rendering API for any mod.
 
-> **🎉 v26.0 Alpha 1 Released!** — Fabric 1.21.10 with Platform Abstraction Layer is now available.  
+> **v26.0 Alpha 1 development is in progress.** Fabric 1.21.10 and NeoForge 1.21.10 have passed full 2D/3D runtime verification.
 > [Download](releases/v26.0-alpha.1) | [Release Notes](releases/v26.0-alpha.1/RELEASE_NOTES.md) | [Test Results](memory/FACT.md#架构重构完整完成)
 
 ## Features
@@ -34,7 +34,7 @@ Originally extracted from the Epsilon HvH client (NekoyaHouse), now maintained a
 - **LuminShot Platform Abstraction** - Cross-loader compatibility layer
   - `LuminPlatform` interface
   - `PlatformRegistry` registration mechanism
-  - `Fabric1210Platform` implementation (Modern GPU API)
+  - Fabric and NeoForge 1.21.10 implementations (Modern GPU API)
 - **Ring Buffer GPU Management** - Dynamic capacity expansion
 - **Framebuffer Management** - Render target system
 
@@ -102,10 +102,11 @@ Render3DScheduler.INSTANCE.addLine(center, center.add(3, 0, 0), Color.RED, 1.5f)
 
 ```
 OpenLumin/
-├── common/                  # Version-agnostic core
-├── fabric-1.21.10/          # Fabric 1.21.10 (OpenGL baseline)
+├── fabric-1.21.10/          # 1.21.10 OpenGL business-code baseline
+├── fabric-26.1.2/           # Fabric 26.1.2 port baseline (loader skeleton ready)
 ├── fabric-1.21.4/           # Fabric 1.21.4 (Legacy OpenGL reference)
-├── neoforge-1.21.10/        # NeoForge 1.21.10 (WIP)
+├── neoforge-1.21.10/        # NeoForge adapter reusing the 1.21.10 baseline
+├── neoforge-26.1.2/         # NeoForge 26.1.2 adapter (loader skeleton ready)
 ├── neoforge-1.21.4/         # NeoForge 1.21.4 (Legacy reference)
 ├── openlumin-testmod/       # Test mod (separate project)
 └── releases/                # Release packages
@@ -132,23 +133,25 @@ OpenLumin/
 ┌─────────────────────────────────────┐
 │  Platform Implementations           │
 │  - Fabric1210Platform (Modern API)  │
-│  - NeoForge1210Platform (WIP)       │
+│  - NeoForge1210Platform (Modern API)│
 │  - Fabric1214Platform (Legacy GL)   │
 └─────────────────────────────────────┘
 ```
 
 ## Version Support
 
-| Minecraft | Fabric | NeoForge | Forge | Status |
-|-----------|--------|----------|-------|--------|
-| 1.21.10   | ✅      | 🔜       | 🔜    | Alpha 1 |
-| 1.21.4    | ✅      | ✅       | 🔜    | Reference |
-| 26.1      | 🔜     | 🔜       | 🔜    | Planned |
-| 26.2      | 🔜     | 🔜       | 🔜    | Planned |
+| Minecraft | Fabric | NeoForge | Status |
+|-----------|--------|----------|--------|
+| 1.21.10   | ✅      | ✅        | Alpha 1 complete |
+| 1.21.4    | ✅      | ✅        | Reference |
+| 26.1.2    | 🔄      | 🔄        | Build skeletons verified; rendering port in progress |
+| 26.2      | 🔜      | 🔜        | Alpha 1 planned |
+
+Forge is not supported for Minecraft 1.21.x or newer. OpenLumin focuses its modern product line on Fabric and NeoForge.
 
 ## Development Roadmap
 
-- **Alpha 1** ✅ - Basic 2D/3D API, Platform abstraction (Fabric 1.21.10)
+- **Alpha 1** 🔄 - Basic LuminGraphics API across 1.21.10, 26.1.2, and 26.2 on Fabric and NeoForge
 - **Alpha 2** 🔜 - Performance optimization (Sodium/Iris research)
 - **Alpha 3** 🔜 - Advanced lighting, entity rendering
 - **Alpha 4** 🔜 - Replace Sodium/Iris/Optifine

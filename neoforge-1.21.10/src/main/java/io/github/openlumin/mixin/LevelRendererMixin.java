@@ -29,16 +29,14 @@ public abstract class LevelRendererMixin {
             DeltaTracker deltaTracker,
             boolean renderBlockOutline,
             Camera camera,
-            Matrix4f frustumMatrix,
-            Matrix4f projectionMatrix,
             Matrix4f modelViewMatrix,
+            Matrix4f projectionMatrix,
+            Matrix4f frustumMatrix,
             GpuBufferSlice gbufferSlice,
             Vector4f fogColor,
             boolean isFoggy,
             CallbackInfo ci
     ) {
-        if (!Render3DScheduler.INSTANCE.isEmpty()) {
-            Render3DScheduler.INSTANCE.flush(modelViewMatrix, camera.getPosition());
-        }
+        Render3DScheduler.INSTANCE.flush(modelViewMatrix, camera.getPosition());
     }
 }
