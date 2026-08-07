@@ -32,7 +32,7 @@ import net.minecraft.client.Minecraft;
  * 与 1.21.10 基线的差异：
  * - 正交投影改用 Projection + ProjectionMatrixBuffer（1.21.10 用 CachedOrthoProjectionMatrixBuffer）
  * - writeTransform 为 4 参数（26.1.2 的 DynamicUniforms 无 lineWidth 字段）
- * - 资源标识使用 Identifier（替代 ResourceLocation）
+ * - 资源标识使用 Identifier（替代 Identifier）
  * - 采样器为独立 GpuSampler，经平台抽象层解析
  */
 public class LuminRenderSystem {

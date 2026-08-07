@@ -1,0 +1,175 @@
+package io.github.openlumin.renderers;
+
+import io.github.openlumin.LuminRenderPipelines;
+import io.github.openlumin.LuminRenderSystem;
+import io.github.openlumin.buffer.LuminRingBuffer;
+import io.github.openlumin.holders.RendererHolder;
+import io.github.openlumin.utils.render.ScissorUtils;
+import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.util.ARGB;
+import org.lwjgl.system.MemoryUtil;
+
+import java.awt.*;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+
+/**
+ * 弧/环段/扇形渲染器。
+ * <p>
+ * 复用 ROUND_RECT 顶点格式（Position + Color + InnerRect + Radius），走 ARC 管线。
+ * InnerRect 携带外椭圆包围盒；Radius vec4 塞入 (startAngle, endAngle, innerRatio, 0)，
+ * 片段着色器用椭圆环带 SDF + 角度掩码求值。
+ * innerRatio=0 为实心扇形(pie)，>0 为环段。
+ */
+public class ArcRenderer implements IRenderer {
+
+    private static final long BUFFER_SIZE = 16 * 1024;
+    private static final int STRIDE = 48;
+    private static final long RECT_BYTES = STRIDE * 4L;
+    private final LuminRingBuffer buffer = new LuminRingBuffer(BUFFER_SIZE, GpuBuffer.USAGE_VERTEX);
+
+    private boolean scissorEnabled = false;
+    private int scissorX, scissorY, scissorW, scissorH;
+    private long currentOffset = 0;
+    private int vertexCount = 0;
+    private LuminRenderSystem.QuadRenderingInfo sharedInfo;
+
+    private ArcRenderer() {
+    }
+
+    public static ArcRenderer create() {
+        return RendererHolder.INSTANCE.register(new ArcRenderer());
+    }
+
+    public void addArc(float x, float y, float width, float height,
+                       float startAngle, float endAngle, float innerRatio, Color color) {
+        addArcGradient(x, y, width, height, startAngle, endAngle, innerRatio, color, color, color, color);
+    }
+
+    /**
+     * 颜色顺序对应包围盒四角顶点：左上、左下、右下、右上 (TL, BL, BR, TR)。
+     * 角度为弧度制（atan2 约定），innerRatio ∈ [0,1]：0=实心扇形，>0=环段。
+     */
+    public void addArcGradient(float x, float y, float width, float height,
+                               float startAngle, float endAngle, float innerRatio,
+                               Color cTL, Color cBL, Color cBR, Color cTR) {
+        buffer.ensureCapacity(currentOffset + RECT_BYTES);
+        buffer.tryMap();
+        float x2 = x + width, y2 = y + height;
+        int argbTL = ARGB.toABGR(cTL.getRGB());
+        int argbBL = ARGB.toABGR(cBL.getRGB());
+        int argbBR = ARGB.toABGR(cBR.getRGB());
+        int argbTR = ARGB.toABGR(cTR.getRGB());
+
+        addVertex(x, y, x, y, x2, y2, startAngle, endAngle, innerRatio, argbTL);
+        addVertex(x, y2, x, y, x2, y2, startAngle, endAngle, innerRatio, argbBL);
+        addVertex(x2, y2, x, y, x2, y2, startAngle, endAngle, innerRatio, argbBR);
+        addVertex(x2, y, x, y, x2, y2, startAngle, endAngle, innerRatio, argbTR);
+    }
+
+    private void addVertex(float vx, float vy, float rx1, float ry1, float rx2, float ry2,
+                           float startAngle, float endAngle, float innerRatio, int color) {
+        long baseAddr = MemoryUtil.memAddress(buffer.getMappedBuffer());
+        long p = baseAddr + currentOffset;
+        MemoryUtil.memPutFloat(p, vx);
+        MemoryUtil.memPutFloat(p + 4, vy);
+        MemoryUtil.memPutFloat(p + 8, 0.0f);
+        MemoryUtil.memPutInt(p + 12, color);
+        MemoryUtil.memPutFloat(p + 16, rx1);
+        MemoryUtil.memPutFloat(p + 20, ry1);
+        MemoryUtil.memPutFloat(p + 24, rx2);
+        MemoryUtil.memPutFloat(p + 28, ry2);
+        // Radius vec4: startAngle, endAngle, innerRatio, spare
+        MemoryUtil.memPutFloat(p + 32, startAngle);
+        MemoryUtil.memPutFloat(p + 36, endAngle);
+        MemoryUtil.memPutFloat(p + 40, innerRatio);
+        MemoryUtil.memPutFloat(p + 44, 0.0f);
+        currentOffset += STRIDE;
+        vertexCount++;
+    }
+
+    @Override
+    public void draw() {
+        if (vertexCount == 0) return;
+        if (buffer.isMapped()) buffer.unmap();
+
+        LuminRenderSystem.QuadRenderingInfo info = LuminRenderSystem.prepareQuadRendering(vertexCount);
+        if (info == null || info.colorView() == null) return;
+        if (scissorEnabled && !ScissorUtils.isVisible(scissorW, scissorH)) return;
+
+        try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
+                () -> "Arc Draw", info.colorView(), OptionalInt.empty(),
+                info.depthView(), OptionalDouble.empty())
+        ) {
+            pass.setPipeline(LuminRenderPipelines.ARC);
+            if (scissorEnabled) ScissorUtils.enableScissor(pass, scissorX, scissorY, scissorW, scissorH);
+            pass.setUniform("DynamicTransforms", info.dynamicUniforms());
+            drawPrepared(pass, info);
+        }
+    }
+
+    @Override
+    public boolean prepareSharedDraw() {
+        sharedInfo = null;
+        if (vertexCount == 0) return false;
+        if (buffer.isMapped()) buffer.unmap();
+        if (scissorEnabled && !ScissorUtils.isVisible(scissorW, scissorH)) return false;
+
+        sharedInfo = LuminRenderSystem.prepareQuadRendering(vertexCount, false);
+        return sharedInfo != null && sharedInfo.colorView() != null;
+    }
+
+    @Override
+    public void draw(RenderPass pass) {
+        if (sharedInfo == null) return;
+        pass.setUniform("DynamicTransforms", sharedInfo.dynamicUniforms());
+        drawPrepared(pass, sharedInfo);
+    }
+
+    private void drawPrepared(RenderPass pass, LuminRenderSystem.QuadRenderingInfo info) {
+        if (scissorEnabled) {
+            if (!ScissorUtils.enableScissor(pass, scissorX, scissorY, scissorW, scissorH)) {
+                return;
+            }
+        } else {
+            pass.disableScissor();
+        }
+
+        pass.setVertexBuffer(0, buffer.getGpuBuffer());
+        pass.setIndexBuffer(LuminRenderSystem.getQuadIndexBuffer(info.indexCount()), LuminRenderSystem.getQuadIndexType());
+        pass.drawIndexed(0, 0, info.indexCount(), 1);
+    }
+
+    @Override
+    public void clear() {
+        if (vertexCount > 0) {
+            if (buffer.isMapped()) buffer.unmap();
+            buffer.rotate();
+        }
+        vertexCount = 0;
+        currentOffset = 0;
+        sharedInfo = null;
+    }
+
+    @Override
+    public void close() {
+        buffer.close();
+        RendererHolder.INSTANCE.unregister(this);
+    }
+
+    public void setScissor(int x, int y, int width, int height) {
+        LuminRenderSystem.ScissorRect scissor = ScissorUtils.clampFramebufferScissor(x, y, width, height);
+        scissorEnabled = true;
+        scissorX = scissor.x();
+        scissorY = scissor.y();
+        scissorW = scissor.width();
+        scissorH = scissor.height();
+    }
+
+    public void clearScissor() {
+        scissorEnabled = false;
+    }
+
+}

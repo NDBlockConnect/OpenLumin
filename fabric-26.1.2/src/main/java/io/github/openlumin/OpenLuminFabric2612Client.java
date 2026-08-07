@@ -9,6 +9,6 @@ public final class OpenLuminFabric2612Client implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         PlatformRegistry.register(new Fabric2612Platform());
-        System.out.println("[OpenLumin] fabric-26.1.2 adapter initialized");
+        Constants.LOGGER.info("fabric-26.1.2 adapter initialized");
     }
 }

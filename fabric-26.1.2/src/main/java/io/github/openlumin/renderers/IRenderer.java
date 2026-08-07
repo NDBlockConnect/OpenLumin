@@ -7,14 +7,14 @@ public interface IRenderer {
     void draw();
 
     /**
-     * 准备共享绘制，返回是否准备成功
+     * NeoForge适配：准备共享绘制，返回是否准备成功
      */
     default boolean prepareSharedDraw() {
         return false;
     }
 
     /**
-     * 使用共享RenderPass进行绘制
+     * NeoForge适配：使用共享RenderPass进行绘制
      */
     default void draw(RenderPass pass) {
         // 默认实现为空
