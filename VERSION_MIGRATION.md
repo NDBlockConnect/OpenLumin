@@ -33,3 +33,11 @@
 - Alpha 1 从 9 个目标缩减为 6 个目标：1.21.10、26.1.2、26.2 各自的 Fabric 与 NeoForge。
 - `fabric-26.1.2` 与 `neoforge-26.1.2` 独立加载器骨架均已构建通过。
 - 26.1.2 使用 Java 25；Fabric 使用 Loom 1.17.17、Loader 0.19.3、Fabric API 0.155.2，NeoForge 使用 26.1.2.94 与 NeoGradle 7.1.38。
+
+## 2026-08-08 Alpha 1 六目标完成
+
+- 26.1.2 渲染基线完成：共享平台抽象、immediate renderer、2D/字体/3D 全栈迁移，MDL 加载验证通过。
+- 26.2 Vulkan 基线完成：bind group 管线体系、GpuFormat 顶点属性、PrimitiveTopology 图元、GameRenderer 帧尾钩子适配，MDL 加载验证通过。
+- NeoForge 两版本经相对路径 srcDir 复用对应 Fabric 基线源码。
+- 工具链：26.1.2 = Loom 1.17.17 / NeoGradle 7.1.38 / Java 25；26.2 = Loom 1.18.0-alpha.13 / Gradle 9.7.0 / NeoForge 26.2.0.51-beta / Java 25。
+- releases/v26.0-alpha.1 收齐四个新 JAR；渲染显示效果待游戏内实测。

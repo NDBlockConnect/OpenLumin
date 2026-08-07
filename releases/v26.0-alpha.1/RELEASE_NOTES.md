@@ -8,9 +8,16 @@ OpenLumin v26.0 Alpha 1 是项目的首个公开测试版本，包含基础的 2
 
 ## 支持版本
 
-- ✅ **Minecraft 1.21.10 + Fabric Loader 0.16.9+**（当前发布）
-- ✅ **Minecraft 1.21.10 + NeoForge 21.10.64**（PreRelease 已提供，2D/3D 运行验证通过）
-- 🔜 其他版本（后续 Alpha 版本）
+| 平台组合 | 状态 | JAR |
+|---|---|---|
+| Minecraft 1.21.10 + Fabric | ✅ 发布，2D/3D 运行验证通过 | `openlumin-fabric-1.21.10-v26.0-alpha.1.jar` |
+| Minecraft 1.21.10 + NeoForge 21.10.64 | ✅ 运行验证通过 | （经 sourceSets 与 Fabric 同基底） |
+| Minecraft 26.1.2 + Fabric 0.19.3 | ✅ 构建+加载验证通过，渲染显示待实测 | `openlumin-fabric-26.1.2-v26.0-alpha.1.jar` |
+| Minecraft 26.1.2 + NeoForge 26.1.2.94 | ✅ 构建+加载验证通过，渲染显示待实测 | `openlumin-neoforge-26.1.2-v26.0-alpha.1.jar` |
+| Minecraft 26.2 + Fabric 0.19.3 | ✅ 构建+加载验证通过，渲染显示待实测 | `openlumin-fabric-26.2-v26.0-alpha.1.jar` |
+| Minecraft 26.2 + NeoForge 26.2.0.51-beta | ✅ 构建+加载验证通过，渲染显示待实测 | `openlumin-neoforge-26.2-v26.0-alpha.1.jar` |
+
+测试模组（仅 1.21.10）：`openlumin-testmod-fabric-1.21.10-v26.0-alpha.1.jar`
 
 ## 新增功能
 
@@ -87,8 +94,9 @@ OpenLumin v26.0 Alpha 1 是项目的首个公开测试版本，包含基础的 2
 
 ## 已知问题
 
-- ⚠️ 当前已完成 Fabric/NeoForge 1.21.10，26.1.2/26.2 系列仍在适配
+- ⚠️ 26.1.2/26.2 四个 JAR 已通过构建与 MDL 加载验证（模组加载、平台注册成功），游戏内渲染显示效果待实测确认
 - ⚠️ Minecraft 1.21.x 及以上不提供 Forge 版本
+- ⚠️ 26.2 为 Vulkan 基底，渲染 API 与 26.1 差异较大（bind group、GpuFormat、PrimitiveTopology），shader 资源需在实测中核对属性绑定
 - ⚠️ 部分 Shader 功能（3D box blur）未实现
 - ⚠️ 字体渲染需要手动指定 TTF 文件路径
 
@@ -98,7 +106,7 @@ OpenLumin v26.0 Alpha 1 是项目的首个公开测试版本，包含基础的 2
 - **Phase 1**: 创建 LuminShot Platform 抽象层 ✅
 - **Phase 2**: 重构业务层使用抽象接口 ✅
 - **Phase 3**: 扩展到 NeoForge 1.21.10 ✅
-- **Phase 4**: 推广到 26.1.2/26.2 的 Fabric 与 NeoForge，共 6 个 Alpha 1 目标 🔜
+- **Phase 4**: 推广到 26.1.2/26.2 的 Fabric 与 NeoForge，共 6 个 Alpha 1 目标 ✅（构建+加载验证通过；26.1.2/26.2 渲染显示待游戏内实测）
 
 ### 渲染验证
 - ✅ 平台抽象层运行时验证通过
@@ -110,10 +118,10 @@ OpenLumin v26.0 Alpha 1 是项目的首个公开测试版本，包含基础的 2
 - Shader 预编译缓存
 - 批量渲染优化
 
-## 下一步计划（Alpha 1）
+## 下一步计划（Alpha 2）
 
-1. **Fabric/NeoForge 26.1.2 支持**
-2. **Fabric/NeoForge 26.2 支持**
+1. **26.1.2/26.2 游戏内渲染实测与修正**（shader 属性绑定、采样器、混合状态）
+2. **Alpha 2 性能研究**：Sodium、Iris、Optifine 参考实现
 3. **完成六个平台目标后进入 Alpha 2 性能研究**
 
 ## 反馈与支持

@@ -103,10 +103,12 @@ Render3DScheduler.INSTANCE.addLine(center, center.add(3, 0, 0), Color.RED, 1.5f)
 ```
 OpenLumin/
 ├── fabric-1.21.10/          # 1.21.10 OpenGL business-code baseline
-├── fabric-26.1.2/           # Fabric 26.1.2 port baseline (loader skeleton ready)
+├── fabric-26.1.2/           # Fabric 26.1.2 rendering baseline (build+load verified)
+├── fabric-26.2/             # Fabric 26.2 Vulkan baseline (build+load verified)
 ├── fabric-1.21.4/           # Fabric 1.21.4 (Legacy OpenGL reference)
 ├── neoforge-1.21.10/        # NeoForge adapter reusing the 1.21.10 baseline
-├── neoforge-26.1.2/         # NeoForge 26.1.2 adapter (loader skeleton ready)
+├── neoforge-26.1.2/         # NeoForge 26.1.2 adapter (build+load verified)
+├── neoforge-26.2/           # NeoForge 26.2 adapter (build+load verified)
 ├── neoforge-1.21.4/         # NeoForge 1.21.4 (Legacy reference)
 ├── openlumin-testmod/       # Test mod (separate project)
 └── releases/                # Release packages
@@ -144,8 +146,8 @@ OpenLumin/
 |-----------|--------|----------|--------|
 | 1.21.10   | ✅      | ✅        | Alpha 1 complete |
 | 1.21.4    | ✅      | ✅        | Reference |
-| 26.1.2    | 🔄      | 🔄        | Build skeletons verified; rendering port in progress |
-| 26.2      | 🔜      | 🔜        | Alpha 1 planned |
+| 26.1.2    | ✅      | ✅        | Build+load verified; in-game rendering pending |
+| 26.2      | ✅      | ✅        | Build+load verified; Vulkan baseline, rendering pending |
 
 Forge is not supported for Minecraft 1.21.x or newer. OpenLumin focuses its modern product line on Fabric and NeoForge.
 

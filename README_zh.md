@@ -103,10 +103,12 @@ Render3DScheduler.INSTANCE.addLine(center, center.add(3, 0, 0), Color.RED, 1.5f)
 ```
 OpenLumin/
 ├── fabric-1.21.10/          # 1.21.10 OpenGL 业务代码基底
-├── fabric-26.1.2/           # Fabric 26.1.2 移植基底（加载器骨架已通过构建）
+├── fabric-26.1.2/           # Fabric 26.1.2 渲染基线（构建+加载验证通过）
+├── fabric-26.2/             # Fabric 26.2 Vulkan 基线（构建+加载验证通过）
 ├── fabric-1.21.4/           # Fabric 1.21.4（旧版 OpenGL 参考）
 ├── neoforge-1.21.10/        # 复用 1.21.10 基底的 NeoForge 适配层
-├── neoforge-26.1.2/         # NeoForge 26.1.2 适配层（加载器骨架已通过构建）
+├── neoforge-26.1.2/         # NeoForge 26.1.2 适配层（构建+加载验证通过）
+├── neoforge-26.2/           # NeoForge 26.2 适配层（构建+加载验证通过）
 ├── neoforge-1.21.4/         # NeoForge 1.21.4（旧版参考）
 ├── openlumin-testmod/       # 测试模组（独立项目）
 └── releases/                # 发布包
@@ -144,8 +146,8 @@ OpenLumin/
 |-----------|--------|----------|--------|
 | 1.21.10   | ✅      | ✅        | Alpha 1 已完成 |
 | 1.21.4    | ✅      | ✅        | 参考 |
-| 26.1.2    | 🔄      | 🔄        | 构建骨架已验证，渲染移植进行中 |
-| 26.2      | 🔜      | 🔜        | Alpha 1 计划中 |
+| 26.1.2    | ✅      | ✅        | 构建+加载验证通过，渲染显示待实测 |
+| 26.2      | ✅      | ✅        | 构建+加载验证通过，渲染显示待实测（Vulkan 基底） |
 
 Minecraft 1.21.x 及以上版本不支持 Forge；OpenLumin 的现代产品线集中维护 Fabric 与 NeoForge。
 
