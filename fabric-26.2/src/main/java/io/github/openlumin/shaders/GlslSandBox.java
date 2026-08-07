@@ -1,0 +1,129 @@
+package io.github.openlumin.shaders;
+
+import net.minecraft.resources.Identifier;
+import io.github.openlumin.LuminRenderSystem;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.blaze3d.buffers.Std140Builder;
+import com.mojang.blaze3d.buffers.Std140SizeCalculator;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import io.github.openlumin.LuminRenderPipelines;
+import com.mojang.blaze3d.shaders.UniformType;
+import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.GpuTextureView;
+import net.minecraft.client.renderer.DynamicUniformStorage;
+import net.minecraft.client.renderer.RenderPipelines;
+
+import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.OptionalDouble;
+import java.util.Optional;
+
+import net.minecraft.client.Minecraft;
+
+/**
+ * fabric-1.21.10 override：GpuTextureView 改用 textures 包。
+ */
+public class GlslSandBox implements AutoCloseable {
+
+    public static final GlslSandBox INSTANCE = new GlslSandBox();
+
+    public static final Identifier SEA_LEVEL = Identifier.fromNamespaceAndPath("openlumin","menu/sea_level");
+    public static final Identifier CLOUDS = Identifier.fromNamespaceAndPath("openlumin","menu/clouds");
+    public static final Identifier ALIEN_TERRAIN = Identifier.fromNamespaceAndPath("openlumin","menu/alien_terrain");
+    public static final Identifier INFERNO = Identifier.fromNamespaceAndPath("openlumin","menu/inferno");
+    public static final Identifier PLANET = Identifier.fromNamespaceAndPath("openlumin","menu/planet");
+    public static final Identifier BLACK_HOLE = Identifier.fromNamespaceAndPath("openlumin","menu/black_hole");
+    public static final Identifier MINECRAFT = Identifier.fromNamespaceAndPath("openlumin","menu/minecraft");
+
+    private static final int SANDBOX_INFO_SIZE = new Std140SizeCalculator()
+            .putVec4()
+            .putVec4()
+            .get();
+
+    private final Map<Identifier, RenderPipeline> pipelines = new HashMap<>();
+
+    private long initTime = System.currentTimeMillis();
+
+    private RenderPipeline getOrCreatePipeline(Identifier fragmentShader) {
+        return pipelines.computeIfAbsent(fragmentShader, shader -> RenderPipeline.builder(LuminRenderPipelines.POST_SNIPPET)
+                .withLocation(Identifier.fromNamespaceAndPath(shader.getNamespace(), "pipelines/glsl_sandbox/" + shader.getPath().replace('/', '_')))
+                .withVertexShader(Identifier.withDefaultNamespace("core/screenquad"))
+                .withFragmentShader(shader)
+                    .withBindGroupLayout(LuminRenderPipelines.POST_LAYOUT)
+                .withCull(false)
+                .build()
+        );
+    }
+
+    public void resetTime() {
+        initTime = System.currentTimeMillis();
+    }
+
+    public void render(Identifier fragmentShader, double mouseX, double mouseY) {
+        render(fragmentShader, mouseX, mouseY, initTime);
+    }
+
+    public void render(Identifier fragmentShader, double mouseX, double mouseY, long startTimeMs) {
+        GpuTextureView colorView = LuminRenderSystem.resolveColorView();
+        if (colorView == null) return;
+
+        final var activeTarget = LuminRenderSystem.getActiveTarget();
+        final int targetWidth = activeTarget != null ? activeTarget.width() : Minecraft.getInstance().gameRenderer.mainRenderTarget().width;
+        final int targetHeight = activeTarget != null ? activeTarget.height() : Minecraft.getInstance().gameRenderer.mainRenderTarget().height;
+
+        if (targetWidth <= 0 || targetHeight <= 0) return;
+
+        float scaleX = targetWidth / LuminRenderSystem.getScaledWidth();
+        float scaleY = targetHeight / LuminRenderSystem.getScaledHeight();
+
+        float mousePxX = (float) mouseX * scaleX;
+        float mousePxY = (float) mouseY * scaleY;
+        float mouseUvX = mousePxX / targetWidth;
+        float mouseUvY = (targetHeight - 1.0f - mousePxY) / targetHeight;
+        float elapsedTime = (System.currentTimeMillis() - startTimeMs) / 1000.0f;
+
+        GpuBufferSlice sandboxInfo = LuminRenderSystem.writeDynamicUniform(
+                "glsl_sandbox_info",
+                "Lumin GLSL Sandbox UBO",
+                SANDBOX_INFO_SIZE,
+                4,
+                new SandboxInfo(targetWidth, targetHeight, elapsedTime, mouseUvX, mouseUvY, mousePxX, mousePxY)
+        );
+
+        final var encoder = RenderSystem.getDevice().createCommandEncoder();
+        try (RenderPass pass = encoder.createRenderPass(
+                () -> "Lumin GLSL Sandbox",
+                colorView, Optional.empty(),
+                LuminRenderSystem.resolveDepthView(), OptionalDouble.empty())
+        ) {
+            pass.setPipeline(getOrCreatePipeline(fragmentShader));
+            pass.setUniform("GlslSandboxInfo", sandboxInfo);
+            pass.draw(0, 0, 0, 3);
+        }
+    }
+
+    @Override
+    public void close() {
+        pipelines.clear();
+    }
+
+    private record SandboxInfo(
+            float width,
+            float height,
+            float elapsedTime,
+            float mouseUvX,
+            float mouseUvY,
+            float mousePxX,
+            float mousePxY
+    ) implements DynamicUniformStorage.DynamicUniform {
+
+        @Override
+        public void write(ByteBuffer buffer) {
+            Std140Builder.intoBuffer(buffer)
+                    .putVec4(width, height, elapsedTime, 0.0f)
+                    .putVec4(mouseUvX, mouseUvY, mousePxX, mousePxY);
+        }
+    }
+}
