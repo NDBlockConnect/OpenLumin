@@ -78,12 +78,18 @@ public class BlurShader {
 
     private void ensureBoxProgram() {
         if (this.boxPipeline == null) {
+            // blur_3d_box.vsh 依赖 DynamicTransforms(ModelViewMat) 与 Projection(ProjMat)，
+            // 盒体几何经 POSITION_COLOR 网格 drawIndexed 提交；
+            // POST_PROCESSING_SNIPPET 仅含 EMPTY 顶点格式且不声明任何 UBO，必须显式补齐。
             this.boxPipeline = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
                     .withLocation(Identifier.fromNamespaceAndPath("openlumin","pipeline/blur_3d_box"))
                     .withVertexShader(BLUR_3D_BOX_PATH)
                     .withFragmentShader(BLUR_3D_BOX_PATH)
+                    .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
+                    .withUniform("Projection", UniformType.UNIFORM_BUFFER)
                     .withUniform("BoxBlurUniforms", UniformType.UNIFORM_BUFFER)
                     .withSampler("InputSampler")
+                    .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
                     .withCull(false)
                     .build();
         }
