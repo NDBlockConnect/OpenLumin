@@ -40,6 +40,15 @@ public class LuminRenderPipelines {
             .withSampler("InputSampler")
             .build();
 
+    /**
+     * 3D 盒体模糊专用绑定组：BoxBlurUniforms UBO + 输入采样器。
+     * blur_3d_box 管线同时经 BASE_SNIPPET 获得 DynamicTransforms/Projection 矩阵绑定。
+     */
+    public static final BindGroupLayout BOX_BLUR_LAYOUT = BindGroupLayout.builder()
+            .withUniform("BoxBlurUniforms", UniformType.UNIFORM_BUFFER)
+            .withSampler("InputSampler")
+            .build();
+
     public final static RenderPipeline.Snippet POST_SNIPPET = RenderPipeline.builder()
             .withBindGroupLayout(POST_LAYOUT)
             .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))

@@ -390,7 +390,7 @@ public class TtfTextRenderer implements ITextRenderer {
             pass.setVertexBuffer(0, batch.buffer.getGpuBuffer().slice());
             pass.bindTexture("Sampler0", atlas.getTexture().getTextureView(), atlas.getTexture().getSampler());
 
-            pass.drawIndexed(0, 0, indexCount, 1, 1);
+            pass.drawIndexed(indexCount, 1, 0, 0, 0);
         }
     }
 

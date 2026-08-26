@@ -105,7 +105,7 @@ public class ShadowRenderer implements IRenderer {
         if (info == null || info.colorView() == null) return;
         if (scissorEnabled && !ScissorUtils.isVisible(scissorW, scissorH)) return;
 
-        // NeoForge不支持RenderSystem.getDevice()和RenderPass API
+        // NeoForge娑撳秵鏁幐涓積nderSystem.getDevice()閸滃enderPass API
         /*
         try {
             try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
@@ -137,7 +137,7 @@ public class ShadowRenderer implements IRenderer {
     @Override
     public void draw(RenderPass pass) {
         if (sharedInfo == null) return;
-        // NeoForge不支持GlStateManager._disableScissorTest()
+        // NeoForge娑撳秵鏁幐涓焞StateManager._disableScissorTest()
         /*
         try {
             pass.setUniform("DynamicTransforms", sharedInfo.dynamicUniforms());
@@ -159,7 +159,7 @@ public class ShadowRenderer implements IRenderer {
 
         pass.setVertexBuffer(0, buffer.getGpuBuffer().slice());
         pass.setIndexBuffer(LuminRenderSystem.getQuadIndexBuffer(info.indexCount()), LuminRenderSystem.getQuadIndexType());
-        pass.drawIndexed(0, 0, info.indexCount(), 1, 1);
+        pass.drawIndexed(info.indexCount(), 1, 0, 0, 0);
     }
 
     @Override

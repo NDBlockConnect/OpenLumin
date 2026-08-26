@@ -22,9 +22,7 @@ import java.util.OptionalDouble;
 import java.util.Optional;
 
 /**
- * fabric-1.21.10 override：
- * - GpuTextureView → textures 包
- * - TextureTransform.DEFAULT_TEXTURING.getMatrix() → new Matrix4f()（单位矩阵）
+ * fabric-1.21.10 override锛? * - GpuTextureView 鈫?textures 鍖? * - TextureTransform.DEFAULT_TEXTURING.getMatrix() 鈫?new Matrix4f()锛堝崟浣嶇煩闃碉級
  */
 public class TriangleRenderer implements IRenderer {
 
@@ -159,7 +157,7 @@ public class TriangleRenderer implements IRenderer {
             pass.disableScissor();
         }
         pass.setVertexBuffer(0, buffer.getGpuBuffer().slice());
-        pass.draw(0, 0, 0, vertexCount);
+        pass.draw(vertexCount, 1, 0, 0);
     }
 
     @Override

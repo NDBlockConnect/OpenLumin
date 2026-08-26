@@ -23,7 +23,7 @@ import java.util.Optional;
 import net.minecraft.client.Minecraft;
 
 /**
- * fabric-1.21.10 override：GpuTextureView 改用 textures 包。
+ * fabric-1.21.10 override锛欸puTextureView 鏀圭敤 textures 鍖呫€?
  */
 public class GlslSandBox implements AutoCloseable {
 
@@ -100,7 +100,7 @@ public class GlslSandBox implements AutoCloseable {
         ) {
             pass.setPipeline(getOrCreatePipeline(fragmentShader));
             pass.setUniform("GlslSandboxInfo", sandboxInfo);
-            pass.draw(0, 0, 0, 3);
+            pass.draw(3, 1, 0, 0);
         }
     }
 

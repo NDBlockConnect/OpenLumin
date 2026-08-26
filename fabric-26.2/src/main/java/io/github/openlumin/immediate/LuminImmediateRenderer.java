@@ -32,14 +32,16 @@ import java.util.Optional;
 import net.minecraft.client.Minecraft;
 
 /**
- * 即时模式渲染器 - OpenLumin 核心组件（26.2 Vulkan 基底）。
+ * 闂佸憡顨夊▍鏇烆渻閸屾鐔煎灳瀹曞洨顢呭┑鐐存尭瀵爼鎮＄€ｎ喖闂?- OpenLumin 闂佸搫绉堕…鍫㈢紦閸撗呯＜闁告洦浜濋浠嬫煥?6.2 Vulkan 闂佺硶鏅涢幖顐よ姳閹惰姤鏅璺虹墐閸?
  *
- * 与 26.1 基线的差异：
- * - 图元类型用 PrimitiveTopology；索引类型用顶层 IndexType
- * - setVertexBuffer 绑定整缓冲 slice；drawIndexed 为 5 参（第五参 instanceCount，约定为 1，待运行时验证）
- * - 映射经 GpuBuffer.map；清屏颜色为 Vector4fc
+ * 婵?26.1 闂佺硶鏅炲▍锝夊吹鎼淬劍鍎嶉柛鏇ㄥ亝閳绘洜鈧鍠栭崑濠勬?
+ * - 闂佹悶鍎查崕鎶藉储閹惧墎灏甸悹鍥皺閳ь剛鍏橀幃?PrimitiveTopology闂佹寧绋掔粙鎾诲磼閵娿儺鍤曢柡鍥╁Ь椤箓鏌涢妸銉剳闁轰降鍊栭妵鍕崉閾忚鍕?IndexType
+ * - setVertexBuffer 缂傚倷鐒﹂崹鐢告偩妤ｅ啫鏋侀悗闈涙憸婢跺嫰鏌?slice闂佹寧绋掗惌鐒wIndexed 婵?5 闂佸憡鐟ラ崑濠勬濞嗘垹绠旀い鎴ｆ硶鐎瑰鏌?instanceCount闂佹寧绋戦惉鑲┾偓鐟扮－閳ь剝顫夐惌顔炬嫻?1闂佹寧绋戦懟顖滄閻斿憡浜ら柟閭﹀灱閺€浠嬫煛閸愩劎鍩ｉ柣娑欑懅閹风姵绗熸繝鍕槴
+ * - 闂佸搫瀚慨鎾儍閻樼數纾?GpuBuffer.map闂佹寧绋掔粙鎺旂博閼姐倓娌煫鍥ㄤ緱閺夊綊鏌ょ涵鍛处閻?Vector4fc
  */
 public final class LuminImmediateRenderer {
+
+    private static boolean loggedDrawDiag;
 
     private static final long DEFAULT_BUFFER_SIZE = 1024 * 1024;
     private static final boolean LITTLE_ENDIAN = ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN;
@@ -231,9 +233,11 @@ public final class LuminImmediateRenderer {
 
         private void putColor(int color) {
             if (this.colorOffset < 0 || !ensureCapacity()) return;
-            // 26.2 RGBA8_UNORM 属性期望打包的 RGBA 字节序
+            // 26.2 的 COLOR 元素为 RGBA8_UNORM，内存字节序须为 R,G,B,A；
+            // vanilla 以 ARGB.toABGR 重排后经 memPutInt（小端）写入，本处保持同一约定。
+            int abgr = net.minecraft.util.ARGB.toABGR(color);
             long p = this.vertexBaseAddr + this.colorOffset;
-            MemoryUtil.memPutInt(p, LITTLE_ENDIAN ? color : Integer.reverseBytes(color));
+            MemoryUtil.memPutInt(p, LITTLE_ENDIAN ? abgr : Integer.reverseBytes(abgr));
         }
 
         private void putUv(float u, float v) {
@@ -290,6 +294,24 @@ public final class LuminImmediateRenderer {
                 if (this.vertexCount <= 0) {
                     return;
                 }
+                if (!loggedDrawDiag) {
+                    loggedDrawDiag = true;
+                    var projSlice = com.mojang.blaze3d.systems.RenderSystem.getProjectionMatrixBuffer();
+                    float f0 = Float.NaN, f1 = Float.NaN, f2 = Float.NaN, f3 = Float.NaN;
+                    if (this.ringBuffer.isMapped()) {
+                        var bb = this.ringBuffer.getMappedBuffer();
+                        int p = bb.position();
+                        f0 = bb.getFloat(p);
+                        f1 = bb.getFloat(p + 4);
+                        f2 = bb.getFloat(p + 8);
+                        f3 = bb.getFloat(p + 12);
+                    }
+                    io.github.openlumin.Constants.LOGGER.info(
+                        "[OpenLumin-SelfTest] draw diag: vtx={} stride={} colorView={} projSlice={} pipeline={} batchOff={} firstXYZ=({},{},{})",
+                        this.vertexCount, this.stride,
+                        LuminRenderSystem.resolveColorView() != null, projSlice != null, this.pipeline.getLocation(),
+                        this.batchStartOffset, f0, f1, f2);
+                }
                 if (this.ringBuffer.isMapped()) this.ringBuffer.unmap();
 
                 GpuTextureView colorView = LuminRenderSystem.resolveColorView();
@@ -313,7 +335,7 @@ public final class LuminImmediateRenderer {
                     pass.setPipeline(this.pipeline);
                     LuminRenderSystem.bindDefaultUniforms(pass);
                     pass.setUniform("DynamicTransforms", dynamicUniforms);
-                    // 26.2：顶点缓冲绑定为 slice
+                    // 26.2闂佹寧绋掑畝鎼佸Υ婵犲洦鍊烽柛锔诲幘婢跺嫰鏌涢幇顖氱毢缂侇噯濡囬埀顒冾潐閻喚鎷?slice
                     pass.setVertexBuffer(0, this.ringBuffer.getGpuBuffer().slice());
 
                     if (this.texture != null) {
@@ -337,12 +359,12 @@ public final class LuminImmediateRenderer {
                                 var autoIndices = RenderSystem.getSequentialBuffer(this.topology);
                                 GpuBuffer ibo = autoIndices.getBuffer(indexCount);
                                 pass.setIndexBuffer(ibo, autoIndices.type());
-                                pass.drawIndexed(baseVertex, 0, indexCount, 1, 1);
+                                pass.drawIndexed(indexCount, 1, 0, baseVertex, 0);
                                 submittedDraw = true;
                             }
                         }
                         default -> {
-                            pass.draw(0, 0, baseVertex, this.vertexCount);
+                            pass.draw(this.vertexCount, 1, baseVertex, 0);
                             submittedDraw = true;
                         }
                     }

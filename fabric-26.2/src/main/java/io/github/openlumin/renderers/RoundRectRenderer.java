@@ -154,7 +154,7 @@ public class RoundRectRenderer implements IRenderer {
 
         pass.setVertexBuffer(0, buffer.getGpuBuffer().slice());
         pass.setIndexBuffer(LuminRenderSystem.getQuadIndexBuffer(info.indexCount()), LuminRenderSystem.getQuadIndexType());
-        pass.drawIndexed(0, 0, info.indexCount(), 1, 1);
+        pass.drawIndexed(info.indexCount(), 1, 0, 0, 0);
     }
 
     @Override

@@ -82,11 +82,16 @@ public class BlurShader {
 
     private void ensureBoxProgram() {
         if (this.boxPipeline == null) {
-            this.boxPipeline = RenderPipeline.builder(LuminRenderPipelines.POST_SNIPPET)
+            // blur_3d_box.vsh 依赖 DynamicTransforms(ModelViewMat) 与 Projection(ProjMat)，
+            // 盒体几何经 POSITION_COLOR 网格 drawIndexed 提交；
+            // POST_SNIPPET/POST_LAYOUT 不含矩阵绑定组与顶点绑定，必须改由 BASE_SNIPPET 提供。
+            this.boxPipeline = RenderPipeline.builder(LuminRenderPipelines.BASE_SNIPPET)
                     .withLocation(Identifier.fromNamespaceAndPath("openlumin","pipeline/blur_3d_box"))
                     .withVertexShader(BLUR_3D_BOX_PATH)
                     .withFragmentShader(BLUR_3D_BOX_PATH)
-                    .withBindGroupLayout(LuminRenderPipelines.POST_LAYOUT)
+                    .withBindGroupLayout(LuminRenderPipelines.BOX_BLUR_LAYOUT)
+                    .withVertexBinding(0, DefaultVertexFormat.POSITION_COLOR)
+                    .withPrimitiveTopology(PrimitiveTopology.QUADS)
                     .withCull(false)
                     .build();
         }
@@ -168,7 +173,7 @@ public class BlurShader {
             renderPass.setUniform("BlurUniforms", blurUniforms);
             // 1.21.10: bindSampler(name, view) — 无需 GpuSampler 对象
             renderPass.bindTexture("InputSampler", input.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
-            renderPass.draw(0, 0, 0, 3);
+            renderPass.draw(3, 1, 0, 0);
         }
     }
 
@@ -240,7 +245,7 @@ public class BlurShader {
             renderPass.bindTexture("InputSampler", input.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
             renderPass.setVertexBuffer(0, vertices.slice());
             renderPass.setIndexBuffer(indices, indexType);
-            renderPass.drawIndexed(0, 0, mesh.drawState().indexCount(), 1, 1);
+            renderPass.drawIndexed(mesh.drawState().indexCount(), 1, 0, 0, 0);
         }
 
         mesh.close();

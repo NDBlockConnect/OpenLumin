@@ -24,8 +24,7 @@ import java.util.Optional;
 import net.minecraft.client.Minecraft;
 
 /**
- * fabric-1.21.10 override：bindTexture → bindSampler，createSampler 已移除。
- */
+ * fabric-1.21.10 override锛歜indTexture 鈫?bindSampler锛宑reateSampler 宸茬Щ闄ゃ€? */
 public class FXAAShader {
 
     public static final FXAAShader INSTANCE = new FXAAShader();
@@ -109,9 +108,9 @@ public class FXAAShader {
         )) {
             renderPass.setPipeline(this.pipeline);
             renderPass.setUniform("FxaaInfo", fxaaInfo);
-            // 1.21.10: bindSampler(name, GpuTextureView) — 无需 GpuSampler 对象
+            // 1.21.10: bindSampler(name, GpuTextureView) 鈥?鏃犻渶 GpuSampler 瀵硅薄
             renderPass.bindTexture("InputSampler", this.input.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
-            renderPass.draw(0, 0, 0, 3);
+            renderPass.draw(3, 1, 0, 0);
         }
     }
 

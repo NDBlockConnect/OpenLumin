@@ -61,7 +61,7 @@ public class RoundRectOutlineRenderer implements IRenderer {
     }
 
     /**
-     * 颜色顺序对应四个角顶点：左上、左下、右下、右上 (TL, BL, BR, TR)
+     * 妫版粏澹婃い鍝勭碍鐎电懓绨查崶娑楅嚋鐟欐帡銆婇悙鐧哥窗瀹革缚绗傞妴浣镐箯娑撳鈧礁褰告稉瀣ㄢ偓浣稿礁娑?(TL, BL, BR, TR)
      */
     public void addOutlineGradient(float x, float y, float width, float height, float radiusTopLeft, float radiusTopRight, float radiusBottomRight, float radiusBottomLeft, float outlineWidth, Color colorTopLeft, Color colorBottomLeft, Color colorBottomRight, Color colorTopRight) {
         if (outlineWidth <= 0.0f) return;
@@ -130,7 +130,7 @@ public class RoundRectOutlineRenderer implements IRenderer {
         if (info == null || info.colorView() == null) return;
         if (scissorEnabled && !ScissorUtils.isVisible(scissorW, scissorH)) return;
 
-        // NeoForge不支持RenderSystem.getDevice()和RenderPass API
+        // NeoForge娑撳秵鏁幐涓積nderSystem.getDevice()閸滃enderPass API
         /*
         try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
                 () -> "Round Rect Outline Draw", info.colorView(), Optional.empty(),
@@ -174,7 +174,7 @@ public class RoundRectOutlineRenderer implements IRenderer {
 
         pass.setVertexBuffer(0, buffer.getGpuBuffer().slice());
         pass.setIndexBuffer(LuminRenderSystem.getQuadIndexBuffer(info.indexCount()), LuminRenderSystem.getQuadIndexType());
-        pass.drawIndexed(0, 0, info.indexCount(), 1, 1);
+        pass.drawIndexed(info.indexCount(), 1, 0, 0, 0);
     }
 
     @Override

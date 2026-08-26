@@ -25,9 +25,7 @@ import java.util.Optional;
 import net.minecraft.client.Minecraft;
 
 /**
- * fabric-1.21.10 override：bindTexture(name, view, sampler) → bindSampler(name, view)，
- * createSampler() 在 1.21.10 中已移除。
- */
+ * fabric-1.21.10 override锛歜indTexture(name, view, sampler) 鈫?bindSampler(name, view)锛? * createSampler() 鍦?1.21.10 涓凡绉婚櫎銆? */
 public class FilterShader {
 
     public static final FilterShader INSTANCE = new FilterShader();
@@ -108,9 +106,9 @@ public class FilterShader {
         )) {
             renderPass.setPipeline(this.pipeline);
             renderPass.setUniform("FilterColor", filterColor);
-            // 1.21.10: bindSampler(name, GpuTextureView) — 无需 GpuSampler 对象
+            // 1.21.10: bindSampler(name, GpuTextureView) 鈥?鏃犻渶 GpuSampler 瀵硅薄
             renderPass.bindTexture("InputSampler", this.input.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
-            renderPass.draw(0, 0, 0, 3);
+            renderPass.draw(3, 1, 0, 0);
         }
     }
 

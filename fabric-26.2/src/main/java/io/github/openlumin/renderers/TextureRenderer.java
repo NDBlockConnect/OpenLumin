@@ -248,7 +248,7 @@ public class TextureRenderer implements IRenderer {
             pass.setVertexBuffer(0, batch.buffer.getGpuBuffer().slice());
             // 1.21.10：bindSampler(name, view) 替代 bindTexture(name, view, sampler)
             pass.bindTexture("Sampler0", texture.getTextureView(), texture.getSampler());
-            pass.drawIndexed(0, 0, indexCount, 1, 1);
+            pass.drawIndexed(indexCount, 1, 0, 0, 0);
         }
     }
 
