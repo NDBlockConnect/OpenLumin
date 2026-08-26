@@ -34,6 +34,24 @@ dependencies {
     implementation "net.neoforged:neoforge:${neo_version}"
 }
 
+// 复用 fabric-26.1.2 的业务代码与资源（26.1 渲染基线，独立工程间经相对路径引用）
+sourceSets {
+    main {
+        java {
+            srcDir file('../fabric-26.1.2/src/main/java')
+            // 排除 Fabric 加载器入口与平台实现（NeoForge 有自己的副本）
+            exclude 'io/github/openlumin/OpenLuminFabric2612Client.java'
+            exclude 'io/github/openlumin/platform/Fabric2612Platform.java'
+            // 排除 Fabric 侧 Mixin 副本（仅排除来自 fabric-26.1.2 目录的，NeoForge 持有自己的副本）
+            exclude { it.file.path.contains('fabric-26.1.2') && it.file.path.contains('mixin') }
+        }
+        resources {
+            srcDir file('../fabric-26.1.2/src/main/resources')
+            exclude 'fabric.mod.json'
+        }
+    }
+}
+
 tasks.withType(ProcessResources).configureEach {
     def replaceProperties = [
             minecraft_version      : minecraft_version,

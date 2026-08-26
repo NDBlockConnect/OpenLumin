@@ -6,7 +6,8 @@
   "mixins": [],
   "client": [
     "LevelRendererMixin",
-    "RenderSystemMixin"
+    "RenderSystemMixin",
+    "GameRendererSelfTestMixin"
   ],
   "injectors": {
     "defaultRequire": 1
