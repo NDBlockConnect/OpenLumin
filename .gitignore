@@ -44,6 +44,10 @@ SOUL.md
 USER.md
 memory/
 .claude/
+.cherry_migration/
+.qwen-agent-sessions/
+.opencode-data/
+.trae/
 
 # AI 生成的文档
 PROGRESS.md
