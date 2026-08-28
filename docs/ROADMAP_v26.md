@@ -1,90 +1,114 @@
-# OpenLumin v26.0 大版本生态研究与规划
+# OpenLumin v26.0 战略路线图
 
-# OpenLumin v26.0 Ecosystem Research & Roadmap
+# OpenLumin v26.0 Strategic Roadmap
 
-> 状态：规划草案（Alpha 2–5 映射） · Status: planning draft
-> 日期：2026-08-26 · GitHub@NDBlockConnect | BlockConnect@StarsailsClover
-
----
-
-## 1. 研究对象总览 / Research Targets
-
-| 项目 | 类型 | 许可 | 与 OpenLumin 的关系 |
-|---|---|---|---|
-| [NoCubes](https://modrinth.com/mod/nocubes) | Modrinth Mod | — | 地形网格化（立方体→平滑网格）参考 |
-| [Project-Crystal-Fracture](https://github.com/Hismeo/Project-Crystal-Fracture) | 整合包+定制模组（1.21.1） | — | 下游消费者：高机动动作肉鸽俯视角，含 3D 地图、nsight GPU 剖析 |
-| [MobileGlues](https://github.com/MobileGL-Dev/MobileGlues) | GL ES→桌面 GL 转译层 | — | 移动端平台路径：OpenLumin 的 GLES 兼容子集目标 |
-| [superresolution](https://github.com/IReallyWantToSleep/superresolution) | Mod（GPL-3.0 / native MIT） | GPL-3.0/MIT | 超分算法集成参考：FSR1/2/3、SGSR1/2、DLSS、XeSS |
-| [SlideShow](https://github.com/teaconmc/SlideShow) | Mod（TeaCon） | — | 世界内媒体/幻灯片渲染用例 |
-| [Arc3D](https://github.com/BloCamLimb/Arc3D) | Java 图形引擎（LGPL-3.0） | LGPL-3.0 | RHI 架构参照：GL/GLES/Vulkan 三后端、SPIR-V 编译器、Maven Central |
-| [ModernUI-MC](https://github.com/BloCamLimb/ModernUI-MC) | Mod / UI 框架（LGPL-3.0） | LGPL-3.0 | UI 引擎参照：文本布局(HarfBuzz)、SDF 文本、共享 GL 上下文存活 |
-| Polytone / AsyncParticles / EMF / EntityCulling / Grassier Grass / Vibrancy / Just Like Rays / Better Lightmap / Rainfall / Particle Rain | Modrinth Mods | 各异 | Alpha 2/3 的机制与特效参考族 |
+> 状态：v26.0 大方向定稿 · Status: v26.0 strategic direction finalized
+> 修订：2026-08-26（重大架构升级） · GitHub@NDBlockConnect | BlockConnect@StarsailsClover
 
 ---
 
-## 2. 按 Alpha 阶段映射 / Phase Mapping
+## 0. v26.0 总目标 / v26.0 North Star
 
-### Alpha 2 — 性能与机制研究（对应现有路线）
+OpenLumin v26.0 目标：**Minecraft 客户端渲染超集**——在功能集与性能上同时超越现有权威方案。
 
-| 方向 | 参照项目 | OpenLumin 落点 |
+- **超集目标（必达）**：**Iris Shaders**（着色管线兼容 + 光影包支持）、**OptiFine**（全部特性：动态光源、连接纹理、随机实体材质、HD 字体、远景等）、**Sodium**（chunk mesh 重构 + 视锥剔除 + 不可见块裁切 + 多核生成）、**Embeddium**（Sodium 的 NeoForge/Fabric 端口 + 兼容层）的功能并集；并超越。
+- **GPU 优化**：**Nvidia/AMD 系显卡优化**（vendor-specific 路径：NvAPI / AGS 检测、硬件 schema 优先、内存放置策略、shader 缓存策略）、**插帧**（frame interpolation，对 AMD FSR/Intel XeSS frame gen 与 Nvidia Frame Warp 接口）、**低延迟**（latency reduction：present-time optimization + input-to-photon 测量）、**渲染机制优化**（BDFGC、GPU 驱动路径、direct state access、persistent-mapped buffers、bindless textures）。
+- **全平台 RHI**：**Vulkan**（1.0+ 基底）、**DirectX 12**（Windows + Xbox GDK 远期）、**Apple Metal**（macOS/iOS）、**OpenGL**（向后兼容旧基线）、**OpenGL ES**（Android/MobileGlues 兼容子集）。**DX12 与 Metal 一同被支持**——这是 26.0 的硬指标，意味着本库在 Windows / Mac 上是 native 一等公民。
+- **现代 Skia 级动画**（自研，类 Skia）：骨骼动画、贝塞尔路径、PathMeasure、形状插值、Color 插值、Layout 过渡、MVVM 生命周期——在 Minecraft 渲染线程可达的目标。提供 LuminGraphics 级别的现代矢量/动画 API。
+- **类 Skia + 类 CSS 的声明式 UI 语言 LuminLang**（自研）：基于 LuminGraphics 引擎的声明式 UI DSL（CSS 风格选择器 + 布局 + 主题），可被第三方模组用来构建 HUD/界面。比硬编码 Java/GUI 更易用。
+- **类 SR 自研超分**（不兼容 superresolution）：OpenLumin 自研超分 pass，命名 `LuminSR`。命名/语义独立于 superresolution mod，避免 GPL 传染。算法参考 FSR1/2/3 + SGSR1/2 + DLSS + XeSS，但实现与调度归我们。AMD FSR Frame Generation 集成作为插帧基线。
+- **类 NoCubes 自研网格**（做得比 NoCubes 更好）：OpenLumin 库 API 暴露"区块 → 任意网格"接口。算法超越 NoCubes 之处：等值面+多分辨率 LOD+异步生成+GPU 端优化+保持硬边锐利度。
+
+---
+
+## 1. 战略子线 / Strategic Subtracks
+
+| 优先级 | 子线 | 关键目标 |
 |---|---|---|
-| 遮蔽剔除 | EntityCulling | Render3DScheduler/实体渲染路径增加遮挡查询剔除；研究其 Raycast 剔除策略 |
-| 异步粒子 | AsyncParticles | 粒子系统异步化（现 LuminImmediateRenderer 为同步提交）；评估跨线程命令录制 |
-| 超分辨率 | superresolution | 以 LuminRenderPipelines 后处理位集成 FSR2/SGSR2；依赖 GL4.3+DSA/SpirV（26.x 基线满足）；**GLES 层（MobileGlues）下 compute/DSA 部分不可用，需保留无超分降级路径** |
-| 光照图 | Better Lightmap | Lightmap 重构方案对比（3D 光照图/色温） |
-| 地形网格 | NoCubes | 区块网格重映射研究（marching cubes/greedy meshing）；属游戏侧机制，评估以库形式输出网格工具 |
-
-### Alpha 3 — 光线计算、实体渲染与机制
-
-| 方向 | 参照项目 | OpenLumin 落点 |
-|---|---|---|
-| 体积光/God Rays | Just Like Rays | 后处理光线投射 pass（复用 LuminRenderTarget/后处理管线） |
-| 环境光/氛围 | Vibrancy | 光照传播与颜色分级参考 |
-| 天气表现 | Rainfall / Particle Rain | 粒子+后处理天气系统；与 AsyncParticles 方案合流 |
-| 植被 | Grassier Grass | 草地渲染变体（顶点动画/覆盖网格） |
-| 实体模型特性 | Entity Model Features | 资源包驱动的实体模型状态机；实体渲染机制研究的一部分 |
-| 视觉定制 | Polytone | 资源包驱动的方块/实体视觉定制协议参考 |
-
-### UI 方向（新模块候选 / UI track）
-
-| 参照 | 评估 |
-|---|---|
-| ModernUI-MC | 成熟 UI 引擎（文本布局 HarfBuzz、SDF 文本、MVVM、RTL），LGPL 可链接。**决策点：OpenLumin UI 模块走自研（对齐 LuminGraphics 的 ui 模块规划）还是集成 ModernUI**。建议 Alpha 2 先做集成可行性 spike（共享 GL 上下文、与 LuminPlatform 的线程门禁对接） |
-| Arc3D | **RHI 架构首要参照**：GL/GLES/Vulkan 三后端、shader 编译器模块、granite 资源管理、Maven Central 发布实践。其模块划分（core/engine/backend 分离）可直接借鉴到 LuminPlatform 的后端化改造 |
-| SlideShow | 世界内媒体渲染用例：纹理流送+世界内投影；可作为 OpenLumin 纹理 API 的验收用例与下游伙伴（TeaCon 社区） |
-
-### 平台扩展 / Platform track（DX12 与移动端）
-
-| 方向 | 评估 |
-|---|---|
-| **DX12 支持** | 动机：Windows 主平台原生后端、Xbox/GDK 远期。**约束：LWJGL 无官方 D3D12 绑定**。可行路径：(a) 第三方 D3D12 绑定（社区 binding 成熟度待评估）；(b) 自建 COM 互操作 native 层（参考 superresolution 的 native 模块组织：Gradle `native:buildNative` + MinGW/CMake）；(c) 经 Arc3D 若其未来增加 D3D12 后端。**建议列入 v26.0 后期（Alpha 4+）预研，先以 RHI 接口收敛为前提**——当前 LuminPlatform 抽象已隔离平台差异，是 DX12 后端的前置条件 |
-| **移动端（MobileGlues）** | GLES 转译层的已知缺口：compute shader、DSA、SpirV 二进制部分不可用（superresolution 实测）。OpenLumin 需维持一条 **GLES 兼容管线子集**（无 compute、无 DSA、无 SpirV 二进制的回退路径），26.1.2 基线（GL 410 core + 传统路径）天然更接近该子集。与 MobileGL-Dev 保持上游对话 |
-
-### 下游生态 / Downstream
-
-- **Project-Crystal-Fracture**：高机动动作肉鸽俯视角整合包（1.21.1），需要高帧率相机控制、3D 地图（MapShow 已独立）、GPU 剖析（nsight 目录）。**行动**：作为 OpenLumin 的下游 showcase 合作候选；其需求（相机、UI、3D 地图）反哺 API 设计。
-- **SlideShow（TeaCon）**：会议级媒体渲染用例。
+| P0 | **渲染超集**（Iris+OptiFine+Sodium+Embeddium） | 功能/性能超集，v26.0 主线 |
+| P0 | **全平台 RHI**（Vulkan/DX12/Metal/GL/GLES） | DX12 + Metal 是硬指标 |
+| P0 | **GPU 优化**（Nvidia/AMD、插帧、低延迟） | 高级游戏体验基线 |
+| P1 | **类 Skia 动画**（LuminAnimation） | 现代 UI/动效基础 |
+| P1 | **类 CSS UI 语言 LuminLang** | 声明式 UI DSL |
+| P1 | **类 SR 自研 LuminSR** | 超分 + 插帧 |
+| P2 | **类 NoCubes 自研地形网格** | 库 API 扩展 |
+| P2 | **下游生态** | Project-Crystal-Fracture 等 showcase 合作 |
 
 ---
 
-## 3. 风险与许可 / Risks & Licensing
+## 2. Alpha 阶段重排 / Alpha Roadmap
+
+Alpha 编号重新规划，反映 v26.0 新目标。Alpha 1 已是历史里程碑（1.21.10/26.1.2/26.2 六目标渲染验证完成）；v26.0 正式线从 Alpha 2 开始重做。
+
+### Alpha 2 — 全平台 RHI 与 Sodium 兼容超集
+
+| 主题 | 内容 | 验收 |
+|---|---|---|
+| 2.1 RHI 后端化 | 把 LuminPlatform 抽象完善为 GL/Vulkan/Metal/DX12 四后端；现有 GL 路径先收敛（GL 4.1+ 基线对齐 26.1.2 测试矩阵） | 四后端 hello triangle |
+| 2.2 块网格重构 | 借鉴 Sodium 的 chunk meshing（fan / greedy / translucent quad sorting）；接入 Iris 顶点格式兼容性 | 视觉无损 vs Sodium；同等或更优 FPS |
+| 2.3 Sodium 视锥剔除 | 实现 sodium 内置的 frustum culling + 不可见面裁切 | 启用后帧时间↓ 30-50% |
+| 2.4 Iris 光影接口层 | 实现 Iris shaderpack JSON 加载 + uniform 协议（mc_Projection、gbuffer samplers 等）的兼容层，使 OpenLumin 在装了 Iris 视觉包的实例上也能跑 | 跑通 ComplementaryReimagined 等主流光影包 |
+
+### Alpha 3 — OptiFine 超集 + Embeddium 兼容
+
+| 主题 | 内容 | 验收 |
+|---|---|---|
+| 3.1 OptiFine 特性全适配 | 动态光源、连接纹理、随机实体材质、HD 字体支持、远景层级、智能树叶、波浪形方块……一项项与 OptiFine 行为对齐并提供配置接口 | OpenLumin 启用了的 OpenLumin 行为 == OptiFine 启用了同选项的 OptiFine 行为 |
+| 3.2 Embeddium 兼容 | 在 NeoForge 上同时以 Embeddium 替代（Embeddium 协议兼容 Sodium；我们就是 Sodium 超集，因此 26.x NeoForge 装载需等价） | 与 Embeddium 互不冲突 / 可叠加 |
+| 3.3 GPU 优化（Pass 1） | 插帧基础：AMD FSR Frame Generation 适配 + Nvidia Frame Warp 集成；延迟监测（PresentMon 接口） | 帧间隔波动 -50% |
+| 3.4 类 Skia 动画起步 | LuminAnimation 核心：Animation / AnimatedValue / PathMeasure / Bezier 路径动画；MVVM 框架最小可用 | 一个示范 HUD 用 LuminAnimation 平滑缩放/淡入 |
+
+### Alpha 4 — 自研核心（S 类）
+
+| 主题 | 内容 | 验收 |
+|---|---|---|
+| 4.1 LuminSR 自研超分 | FSR2-style 空间超分 pass + FSR3-style 插帧集成；不调用 superresolution mod 的代码，独立 native + Java 实现 | 4K 下 1.5x 缩放视觉等同 FSR2 Quality；插帧启用 → 帧率翻倍 |
+| 4.2 LuminLang 类 CSS UI 语言 | 声明式 DSL（类 CSS 选择器 + 样式 + 布局 + 主题/动画绑定）；编译器 = LuminLang → LuminGraphics 操作码 | 一个完整 HUD（角色面板）用 LuminLang 重写，行为与现有一致 + 动画效果 |
+| 4.3 GPU 优化（Pass 2） | Nvidia NvAPI 检测 + AGS 检测 → vendor-specific 路径（硬件内存预算、shader 缓存 LRU 优化、direct storage 探针）；AMD Vulkan 路径优化 | vendor 探测命中后帧时间↓ 5-15% |
+| 4.4 类 NoCubes 自研网格 | 库 API：`BlockMeshProvider`（输入 = 块状态 + 邻块，输出 = 任意 mesh）；自研算法：等值面 (marching cubes) + 自适应 LOD + GPU 端 meshlet + 硬边保护 | 取代 NoCubes：视觉更锐、生成更快、GPU 端可选 |
+
+### Alpha 5 — DX12/Metal 一等公民 + RHI 收敛
+
+| 主题 | 内容 | 验收 |
+|---|---|---|
+| 5.1 DX12 后端（Windows + Xbox GDK 远期） | LWJGL 无官方 D3D12 绑定 → 选型：自建 COM 互操作 native（参考 superresolution 的 `native:buildNative` + MinGW/CMake 组织） | Windows 上选 RHI = DirectX 12 完整工作（光影、视锥、超分、Skia 动画、Sodium 兼容） |
+| 5.2 Apple Metal 后端 | macOS / iOS native；Apple Silicon 性能优化 | macOS 原生 RHI = Metal；iOS 上能跑 OpenLumin（结合 MobileGlues 路径或纯 GLES） |
+| 5.3 全平台 RHI 一致性测试 | 同一 shader / 同一 LuminLang UI 在 4 后端渲染结果像素级一致 | 截图 diff < 可视阈值 |
+| 5.4 低延迟最终调优 | 输入到光子测量全链路 + present 同步策略（DX12：frame pacing；Vulkan：present modes；Metal：CADisplayLink） | 端到端延迟 -30% |
+
+---
+
+## 3. 旧路线项的状态 / Status of Prior Items
+
+旧 ROADMAP v26 的"参照外部项目"研究已沉淀为前置知识，不影响新方向：
+
+- **Arc3D** 架构参照仍然有效，但其模块化（core/engine/backend 分层）作为 LuminPlatform 后端化的具体模板是 RHI 改造的最直接学习材料。
+- **ModernUI**：**决策已定——不走 ModernUI 集成路线。** OpenLumin 走自研 Skia 风格动画 + LuminLang 声明式 UI。ModernUI 项目作为公开/参考研究保留，但不做集成。
+- **superresolution** 的超分算法作为 LuminSR 的参考依据；不集成其代码（LuminSR 自研避免 GPL 传染）。
+- **Project-Crystal-Fracture / SlideShow** 作为下游 showcase 候选保留。
+
+---
+
+## 4. 风险与红线 / Risks & Red Lines
 
 | 项 | 风险 | 对策 |
 |---|---|---|
-| superresolution GPL-3.0 | 集成其代码会传染许可 | 只做**协议级兼容**（超分 pass 自研或用 MIT native 库思路），不拷代码 |
-| Arc3D/ModernUI LGPL-3.0 | 可链接、需隔离 | 以依赖方式引入，不内联源码；遵守 NOTICE |
-| DX12 无 LWJGL 绑定 | native 层维护成本 | Alpha 4+ 预研；先收敛 LuminPlatform RHI 接口 |
-| GLES 子集约束 | 功能降级路径长期共存 | 管线特性矩阵进入 CI（按后端标记 skip） |
-| 多 RHI 并存（Arc3D/PrismRHI/LuminPlatform） | 生态碎片化 | 借鉴而非对抗；UI track 决策时评估与 LuminGraphics 的 ui 模块合流 |
+| Iris/OptiFine/Sodium 行为对齐 | 工作量巨大、易陷入逆向工程 | 优先以"协议兼容"为目标（输入/输出等价 + 配置文件格式兼容），不逆向源码；利用公开文档与社区资源 |
+| DX12 native 层 | 维护负担、LWJGL 缺口 | 参考 superresolution 的 native 模块组织；CMake + MinGW；条件编译 |
+| Metal 后端 | macOS-only 开发资源 | CI 矩阵含 macOS runner；先 LWJGL nativemodule 集成（如有） |
+| 插帧与延迟 | 驱动差异大 | 通过 vendor API 抽象；失败时降级为静态显示 |
+| LuminSR 不兼容 superresolution | 与 SR 互斥 | 文档明示：与 superresolution mod 不兼容，OpenLumin 启用了就不要再装 SR |
+| LuminLang 接受度 | 新 DSL 学习成本 | 文档 + 转换工具（CSS/JSON → LuminLang） |
 
 ---
 
-## 4. 决议待定 / Open Decisions
+## 5. 开放决策 / Open Decisions（已收敛大半）
 
-1. UI track：自研 vs 集成 ModernUI（Alpha 2 spike 后定）
-2. DX12：预研启动时点（建议 Alpha 3 末评估 LWJGL 生态进展）
-3. 超分集成：自研 FSR2 pass vs 协议兼容 superresolution（许可评估后定）
-4. NoCubes 类地形网格：是否纳入库 API（游戏机制 vs 库能力边界）
+1. ~~UI track：自研 vs 集成 ModernUI~~ → **已定：自研 LuminAnimation + LuminLang**
+2. ~~超分集成：自研 vs 协议兼容 superresolution~~ → **已定：自研 LuminSR，与 superresolution mod 不兼容**
+3. DX12：自建 COM 互操作 vs 待 LWJGL 官方 vs 第三方 binding → Alpha 5 评估
+4. Metal：LWJGL nativemodule（待 LWJGL 3.4 文档确认） vs 自建 → Alpha 5
+5. 插帧 vendor 优先级：Nvidia Frame Warp（需 RTX） + AMD FSR FG（开放 + FSR3 许可） vs Intel XeSS-FG（学术） → Alpha 3 spike
 
 ---
 
