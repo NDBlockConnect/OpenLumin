@@ -79,3 +79,6 @@ analyze-dependencies.py
 build-phase1.sh
 generate-modules.py
 dependency-analysis.txt
+
+# 参考项目仓库（独立 clone，不提交）
+_refers/
