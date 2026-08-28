@@ -30,7 +30,8 @@ OpenLumin v26.0 目标：**Minecraft 客户端渲染超集**——在功能集�
 | P0 | **GPU 优化**（Nvidia/AMD、插帧、低延迟） | 高级游戏体验基线 |
 | P1 | **类 Skia 动画**（LuminAnimation） | 现代 UI/动效基础 |
 | P1 | **类 CSS UI 语言 LuminLang** | 声明式 UI DSL |
-| P1 | **类 SR 自研 LuminSR** | 超分 + 插帧 |
+| P1 | **3D 资产与 Demo 录制**（BlockBuster 全家桶 + 模型支持） | 见 `docs/PROPOSALS.md` |
+| P2 | **类 SR 自研 LuminSR** | 超分 + 插帧 |
 | P2 | **类 NoCubes 自研地形网格** | 库 API 扩展 |
 | P2 | **下游生态** | Project-Crystal-Fracture 等 showcase 合作 |
 
@@ -66,6 +67,14 @@ Alpha 编号重新规划，反映 v26.0 新目标。Alpha 1 已是历史里程�
 | 4.2 LuminLang 类 CSS UI 语言 | 声明式 DSL（类 CSS 选择器 + 样式 + 布局 + 主题/动画绑定）；编译器 = LuminLang → LuminGraphics 操作码 | 一个完整 HUD（角色面板）用 LuminLang 重写，行为与现有一致 + 动画效果 |
 | 4.3 GPU 优化（Pass 2） | Nvidia NvAPI 检测 + AGS 检测 → vendor-specific 路径（硬件内存预算、shader 缓存 LRU 优化、direct storage 探针）；AMD Vulkan 路径优化 | vendor 探测命中后帧时间↓ 5-15% |
 | 4.4 类 NoCubes 自研网格 | 库 API：`BlockMeshProvider`（输入 = 块状态 + 邻块，输出 = 任意 mesh）；自研算法：等值面 (marching cubes) + 自适应 LOD + GPU 端 meshlet + 硬边保护 | 取代 NoCubes：视觉更锐、生成更快、GPU 端可选 |
+
+### Alpha 4.5 — 3D 资产与 Demo 录制（详见 `docs/PROPOSALS.md`）
+
+| 主题 | 内容 | 验收 |
+|---|---|---|
+| 4.5.1 3D 模型格式支持 | `LuminModel` 抽象层：玩家皮肤/实体模型统一接口；多格式加载器（BBM/BBE/BBAnim = BlockBuster 系；YesSteveModels 兼容层 = YSM legacy → 新格式运行时兼容；预留 `.geo` / `.anim` 后缀 = Bedrock 几何兼容路径） | 第三方 BBM 模型在游戏中正确加载并播放动画；YSM legacy 模型自动兼容或工具迁移 |
+| 4.5.2 BlockBuster 全家桶（自研） | `LuminDirector`（导演/镜头控制）+ `LuminScene`（场景图）+ `LuminAnimator`（关键帧编辑器 + 曲线 + 导出器）；运行式录制：世界内 GUI 编排镜头；导出为 `.lumiscn`（JSON + LuminLang 脚本 + 世界帧序列） | 用 LuminDirector 在世界里编排一段玩家视角移动+动画，导出后 LuminLang HUD 可无缝回放 |
+| 4.5.3 游戏内录制（类 CS2 Demo） | `LuminRecorder`：记录玩家输入流 + 服务器/世界 tick 流 + 渲染关键帧，输出为 `.lumidemo`（紧凑二进制：输入流 + 世界 delta + 摄像机轨迹 + 音频时间戳）；`LuminReplay`：时间线 UI（LuminLang 表达），支持视角切换、速度 0.25x–4x、关键帧标记 | 录制 → 关闭游戏 → 打开 .lumidemo → 时间线任意拖动回放；与 VCR-mod 等不冲突 |
 
 ### Alpha 5 — DX12/Metal 一等公民 + RHI 收敛
 
