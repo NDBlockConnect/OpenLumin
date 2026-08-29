@@ -123,13 +123,15 @@ drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 
 ## 5. 已知未实现（Alpha 2.1 → 2.2 路线）
 
-| 编号 | 项 | 阻塞 |
-|---|---|---|
-| B5.1 | `LuminRenderTarget`（concrete RenderTarget 子类，提供 getColorTextureView） | `LuminTextureViewGL.toMc()` 当前返 null；B5.1 后才能走 MC 26.2 concrete GlTexture 桥接 |
-| B6.1 | fabric-26.2 testmod 子模块（端到端 self-test on 26.2） | 需创建完整子模块工程；当前 openlumin-testmod 仅 1.21.10 |
-| B7 | neoforge-26.2 同步 GL 后端 | neoforge-26.2 通过 srcDir 引用 fabric-26.2，理论上自动获得，但需 clean build 验证 |
-| B8 | 资源包：自检 shader JSON（rectangle.vsh/.fsh + rectangle 管线 JSON） | 业务层调用 LuminRHI 但无视觉验证 |
-| B9 | 26.2 Release tag（v26.0-Alpha-2 候选） | 取决于游戏内集成验证（无环境） |
+| 编号 | 项 | 阻塞 | 状态 |
+|---|---|---|---|
+| B5.1 | `LuminRenderTarget`（concrete RenderTarget 子类，提供 getColorTextureView） | `LuminTextureViewGL.toMc()` 当前返 null；B5.1 后才能走 MC 26.2 concrete GlTexture 桥接 | 待办 |
+| B6.1 | fabric-26.2 testmod 子模块（端到端 self-test on 26.2） | 需创建完整子模块工程；当前 openlumin-testmod 仅 1.21.10 | 待办 |
+| **B7** | **neoforge-26.2 同步 GL 后端** | **srcDir 复用 fabric-26.2 源** | **✅ BUILD SUCCESSFUL in 7m 46s**（2026-08-26） |
+| B8 | 资源包：自检 shader JSON（rectangle.vsh/.fsh + rectangle 管线 JSON） | 业务层调用 LuminRHI 但无视觉验证 | 待办 |
+| B9 | 26.2 Release tag（v26.0-Alpha-2 候选） | 取决于游戏内集成验证（无环境） | 待办 |
+
+**B7 验证**：neoforge-26.2 `build.gradle` 的 srcDir 指向 `../fabric-26.2/src/main/java`，自动共享同一份 LuminRHI 源。`gradlew.bat clean compileJava` 一次过。javap 抽查确认 neoforge-26.2 build 内 `LuminRHI_GL_SwapchainBridge` / `LuminBufferGL` 字节码与 fabric-26.2 build 完全一致。
 
 ## 6. BC 规范要求复盘
 
