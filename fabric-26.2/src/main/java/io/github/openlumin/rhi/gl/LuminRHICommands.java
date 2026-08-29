@@ -76,11 +76,82 @@ public final class LuminRHICommands {
             }
         }
 
-        /** Alpha 2 占位：uploadTexture 真正格式转换 + 逐行上传在 Alpha 2.1。 */
+        /** Alpha 2.1 实现：uploadTexture 占位（纹理上传走 LuminTextureGL.writeRawBytes）。 */
         private void uploadTexture(LuminTextureGL tex, ByteBuffer pixels) { }
 
-        /** Alpha 2 占位：executeRenderPass 完整逻辑（MC 26.2 RenderPass 资源绑定）在 Alpha 2.1。 */
-        private void executeRenderPass(CommandEncoder encoder, RenderPassCmd rp) { }
+        /**
+         * Alpha 2.1 实现：完整 MC 26.2 RenderPass 翻译链。
+         * 按 8 个 RenderPassAction 顺序执行：
+         *   SetPipeline → SetVertexBuffer* → SetIndexBuffer → SetUniformBuffer* → SetTexture* → Draw / DrawIndexed
+         * 全部在 try-with-resources RenderPass 块内。
+         */
+        private void executeRenderPass(CommandEncoder encoder, RenderPassCmd rp) {
+            // 解析 color/depth attachment — 业务层 LuminTextureView 必须映到 MC GpuTextureView。
+            // 26.2 缺失 GpuTexture.getColorTextureView()；用 RenderTarget 包装（见 LuminRHI_GL.Swapchain 桥接）。
+            com.mojang.blaze3d.textures.GpuTextureView colorView = toMcTextureView(rp.desc.colorAttachment());
+            com.mojang.blaze3d.textures.GpuTextureView depthView = rp.desc.depthAttachment() != null
+                    ? toMcTextureView(rp.desc.depthAttachment())
+                    : null;
+            // createRenderPass 多参版本：color + clearColor + depth + clearDepth + area
+            // 26.2 缺 depth = 0 的 5 参 overload（须用 4 参 + 6 参）。
+            try (com.mojang.blaze3d.systems.RenderPass pass = depthView != null
+                    ? encoder.createRenderPass(() -> "lumin_pass",
+                            colorView, java.util.Optional.empty(),
+                            depthView, java.util.OptionalDouble.empty())
+                    : encoder.createRenderPass(() -> "lumin_pass",
+                            colorView, java.util.Optional.empty())) {
+                for (RenderPassAction action : rp.actions) {
+                    if (action instanceof SetPipelineAction sp) {
+                        if (sp.pipeline() instanceof LuminPipelineGL ppl) {
+                            if (ppl.mcPipeline == null) {
+                                ppl.mcPipeline = bind(ppl);
+                            }
+                            if (ppl.mcPipeline != null) {
+                                pass.setPipeline(ppl.mcPipeline);
+                            }
+                        }
+                    } else if (action instanceof SetVertexBufferAction sv) {
+                        LuminBufferGL lb = (LuminBufferGL) sv.view().buffer();
+                        // GpuBuffer.slice(offset, length) → GpuBufferSlice（MC 26.2）
+                        pass.setVertexBuffer(sv.slot(), lb.gbuf.slice(sv.view().offset(), sv.view().length()));
+                    } else if (action instanceof SetIndexBufferAction si) {
+                        LuminBufferGL lb = (LuminBufferGL) si.buffer();
+                        // MC 26.2 路径：com.mojang.blaze3d.IndexType（不在 VertexFormat 内）
+                        com.mojang.blaze3d.IndexType mcType = switch (si.type()) {
+                            case UINT16 -> com.mojang.blaze3d.IndexType.SHORT;
+                            case UINT32 -> com.mojang.blaze3d.IndexType.INT;
+                        };
+                        pass.setIndexBuffer(lb.gbuf, mcType);
+                    } else if (action instanceof SetUniformBufferAction su) {
+                        LuminBufferGL lb = (LuminBufferGL) su.view().buffer();
+                        com.mojang.blaze3d.buffers.GpuBufferSlice slice =
+                                lb.gbuf.slice(su.view().offset(), su.view().length());
+                        pass.setUniform(su.name(), slice);
+                    } else if (action instanceof SetTextureAction st) {
+                        if (st.view() instanceof LuminTextureViewGL vw) {
+                            com.mojang.blaze3d.textures.GpuTextureView mcView = vw.toMc();
+                            if (st.sampler() instanceof LuminSamplerGL sg) {
+                                pass.bindTexture(st.name(), mcView, sg.gsamp);
+                            }
+                        }
+                    } else if (action instanceof DrawAction d) {
+                        // draw(vertexCount, instanceCount, firstVertex, firstInstance)
+                        pass.draw(d.firstVertex(), d.vertexCount(), d.instanceCount(), d.firstInstance());
+                    } else if (action instanceof DrawIndexedAction di) {
+                        // 26.2 实证语义：drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance)
+                        pass.drawIndexed(di.indexCount(), di.instanceCount(), di.firstIndex(), di.vertexOffset(), di.firstInstance());
+                    }
+                }
+            }
+        }
+
+        /** LuminTextureView → MC GpuTextureView 桥接。 */
+        private static com.mojang.blaze3d.textures.GpuTextureView toMcTextureView(LuminTextureView view) {
+            if (view instanceof LuminTextureViewGL vw) {
+                return vw.toMc();
+            }
+            throw new UnsupportedOperationException("Alpha 2.1: only LuminTextureViewGL supported");
+        }
 
         @Override public void close() { }
     }
