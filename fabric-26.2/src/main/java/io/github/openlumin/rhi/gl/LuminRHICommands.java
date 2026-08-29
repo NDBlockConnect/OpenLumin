@@ -1,8 +1,17 @@
 package io.github.openlumin.rhi.gl;
 
+import com.mojang.blaze3d.PrimitiveTopology;
+import com.mojang.blaze3d.pipeline.ColorTargetState;
+import com.mojang.blaze3d.pipeline.DepthStencilState;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.platform.CompareOp;
+import com.mojang.blaze3d.platform.PolygonMode;
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import io.github.openlumin.rhi.*;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
 
 import java.nio.ByteBuffer;
@@ -76,9 +85,110 @@ public final class LuminRHICommands {
         @Override public void close() { }
     }
 
-    /** 懒绑定 LuminShader 路径到 MC RenderPipeline。Alpha 2 占位。 */
+    /** Alpha 2.1 实现：将 LuminShader 路径懒绑定到 MC RenderPipeline。
+     *
+     * 路径约定（与 LuminRenderPipelines.RECTANGLE 对齐）：
+     *   - vertexPath / fragmentPath 形如 "rectangle" → namespace = "openlumin"
+     *   - LuminVertexFormat.attributes() 决定顶点格式（POSITION_COLOR / POSITION_TEXTURE_COLOR 等）
+     *   - LuminPipelineState 决定 blend / depth / cull / polygon
+     */
     private static com.mojang.blaze3d.pipeline.RenderPipeline bind(LuminPipelineGL ppl) {
-        return null;
+        LuminShader shader = ppl.shader();
+        if (!(shader instanceof LuminShaderGL sgl)) {
+            return null;
+        }
+        // 路径解析：namespace = "openlumin"，path = shader 路径
+        String vPath = sgl.vertexPath;
+        String fPath = sgl.fragmentPath;
+        if (vPath == null || fPath == null) {
+            return null;
+        }
+        Identifier vId = Identifier.fromNamespaceAndPath("openlumin", vPath);
+        Identifier fId = Identifier.fromNamespaceAndPath("openlumin", fPath);
+        Identifier locId = Identifier.fromNamespaceAndPath("openlumin", "pipelines/" + vPath);
+
+        // 顶点格式（按 LuminVertexFormat.attributes 推断 → DefaultVertexFormat 常量）
+        VertexFormat mcVtx = toMcVertexFormat(ppl.vertexFormat());
+
+        // 拓扑（MC 26.2 PrimitiveTopology：LINES/TRIANGLES/QUADS/POINTS/TRIANGLE_STRIP/TRIANGLE_FAN）
+        PrimitiveTopology primTopo = toMcPrimitiveTopology(ppl.vertexFormat());
+
+        // 渲染状态
+        LuminPipelineState st = ppl.state();
+        boolean depthTest = st.depthTest();
+        boolean depthWrite = st.depthWrite();
+        CompareOp depthCmp = toMcCompareOp(st.depthCompare());
+        DepthStencilState ds = new DepthStencilState(depthCmp, depthWrite);
+
+        // 颜色目标 + 混合
+        LuminBlendState blend = st.blend();
+        boolean blendEnabled = blend.enabled();
+        // ColorTargetState(BlendFunction) 单参构造器：GpuFormat 默认 + WRITE_COLOR
+        com.mojang.blaze3d.pipeline.ColorTargetState cts;
+        if (blendEnabled) {
+            cts = new com.mojang.blaze3d.pipeline.ColorTargetState(
+                    com.mojang.blaze3d.pipeline.BlendFunction.TRANSLUCENT);
+        } else {
+            // 不混合：BlendFunction.OVERLAY 单参构造器（不启用 blend）
+            cts = new com.mojang.blaze3d.pipeline.ColorTargetState(
+                    com.mojang.blaze3d.pipeline.BlendFunction.OVERLAY);
+        }
+
+        // 构造
+        RenderPipeline.Builder b = RenderPipeline.builder()
+                .withLocation(locId)
+                .withVertexShader(vId)
+                .withFragmentShader(fId)
+                .withVertexBinding(0, mcVtx)
+                .withPrimitiveTopology(primTopo)
+                .withPolygonMode(toMcPolygonMode(st.polygonMode()))
+                .withCull(st.cullMode() != LuminCullMode.NONE)
+                .withDepthStencilState(ds)
+                .withColorTargetState(0, cts);
+
+        return b.build();
+    }
+
+    /** LuminVertexFormat.attributes → MC VertexFormat 常量映射。
+     * MC 26.2 DefaultVertexFormat 常量：POSITION / POSITION_COLOR / POSITION_TEX /
+     * POSITION_TEX_COLOR / POSITION_COLOR_NORMAL / POSITION_COLOR_LIGHTMAP。 */
+    private static VertexFormat toMcVertexFormat(LuminVertexFormat vf) {
+        var attrs = vf.attributes();
+        if (attrs == null || attrs.length == 0) return DefaultVertexFormat.POSITION;
+        if (attrs.length == 1) return DefaultVertexFormat.POSITION;
+        if (attrs.length == 2) return DefaultVertexFormat.POSITION_TEX;
+        if (attrs.length == 3) return DefaultVertexFormat.POSITION_TEX_COLOR;
+        return DefaultVertexFormat.POSITION_COLOR;
+    }
+
+    private static PrimitiveTopology toMcPrimitiveTopology(LuminVertexFormat vf) {
+        // MC 26.2 PrimitiveTopology 只有：LINES/TRIANGLES/QUADS/POINTS/TRIANGLE_STRIP/TRIANGLE_FAN
+        // 简化为：POSITION_COLOR → QUADS，POSITION_TEX_COLOR → TRIANGLES。
+        var attrs = vf.attributes();
+        if (attrs == null) return PrimitiveTopology.TRIANGLES;
+        if (attrs.length == 1) return PrimitiveTopology.QUADS;
+        return PrimitiveTopology.TRIANGLES;
+    }
+
+    private static PolygonMode toMcPolygonMode(LuminPolygonMode m) {
+        // MC 26.2 PolygonMode 仅 FILL / WIREFRAME；LINE/POINT 退化到 WIREFRAME。
+        return switch (m) {
+            case FILL -> PolygonMode.FILL;
+            case LINE, POINT -> PolygonMode.WIREFRAME;
+        };
+    }
+
+    private static CompareOp toMcCompareOp(LuminCompareOp m) {
+        return switch (m) {
+            case NEVER -> CompareOp.NEVER_PASS;
+            case LESS -> CompareOp.LESS_THAN;
+            case EQUAL -> CompareOp.EQUAL;
+            case LEQUAL -> CompareOp.LESS_THAN_OR_EQUAL;
+            case GREATER -> CompareOp.GREATER_THAN;
+            case NOTEQUAL -> CompareOp.NOT_EQUAL;
+            case GEQUAL -> CompareOp.GREATER_THAN_OR_EQUAL;
+            case ALWAYS -> CompareOp.ALWAYS_PASS;
+        };
     }
 
     /** LuminBufferGL 的颜色写入助手（Alpha 2 占位）。 */
