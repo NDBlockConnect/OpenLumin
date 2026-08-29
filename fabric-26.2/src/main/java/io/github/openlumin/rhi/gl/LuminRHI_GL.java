@@ -99,8 +99,8 @@ public final class LuminRHI_GL implements LuminRHI {
     }
 
     final class SwapchainImpl implements LuminSwapchain {
-        @Override public int width() { return 0; }
-        @Override public int height() { return 0; }
+        @Override public int width() { return LuminRHI_GL_SwapchainBridge.windowWidth(); }
+        @Override public int height() { return LuminRHI_GL_SwapchainBridge.windowHeight(); }
         @Override public LuminFormat format() { return LuminFormat.R8G8B8A8_UNORM; }
         @Override public LuminSwapchainImage acquireNextImage() { return new SwapchainImageImpl(); }
         @Override public void resize(int width, int height) { }
@@ -108,8 +108,8 @@ public final class LuminRHI_GL implements LuminRHI {
 
     final class SwapchainImageImpl implements LuminSwapchainImage {
         SwapchainImageImpl() { }
-        @Override public LuminTexture texture() { throw new UnsupportedOperationException("Alpha 2.1"); }
-        @Override public void present(boolean vsync) { }
+        @Override public LuminTexture texture() { throw new UnsupportedOperationException("SwapchainImage is blit-source only (use LuminRHI_GL_SwapchainBridge.blitToWindow)"); }
+        @Override public void present(boolean vsync) { LuminRHI_GL_SwapchainBridge.blitToWindow(null); }
         void presentInternal(boolean vsync) { present(vsync); }
     }
 
