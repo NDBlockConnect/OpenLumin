@@ -1,0 +1,12 @@
+package io.github.openlumin.rhi;
+
+/** 像素格式 */
+public enum LuminFormat {
+    R8G8B8A8_UNORM, R8G8B8A8_SRGB,
+    R16G16B16A16_FLOAT,
+    R32G32B32A32_FLOAT,
+    R11G11B10_FLOAT,
+    A8_UNORM,
+    D32_FLOAT, D24_UNORM_S8_UINT, D32_FLOAT_S8X24_UINT,
+    BC1_UNORM, BC3_UNORM, BC5_UNORM, BC7_UNORM
+}
