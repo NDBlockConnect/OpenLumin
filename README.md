@@ -1,179 +1,75 @@
 # OpenLumin
 
-[简体中文](README_zh.md) | **English**
+> 跨平台 Minecraft 渲染库（Fabric + NeoForge）——v26.0 渲染超集路线
+> Cross-platform Minecraft rendering library — v26.0 rendering superset roadmap
 
-**OpenLumin** is a high-performance 2D/3D rendering library for Minecraft Java Edition mods.  
-Originally extracted from the Epsilon HvH client (NekoyaHouse), now maintained as a standalone library to provide a unified, version-agnostic rendering API for any mod.
+---
 
-> **v26.0 Alpha 1 development is in progress.** Fabric 1.21.10 and NeoForge 1.21.10 have passed full 2D/3D runtime verification.
-> [Download](releases/v26.0-alpha.1) | [Release Notes](releases/v26.0-alpha.1/RELEASE_NOTES.md) | [Test Results](memory/FACT.md#架构重构完整完成)
+## 状态 / Status
 
-## Features
+| 阶段 | 状态 | 备注 |
+|---|---|---|
+| Alpha 1（1.21.10/26.1.2/26.2 × Fabric/NeoForge 六目标渲染） | ✅ 已发布 v26.0-alpha.1 | 六目标全部渲染实证；drawIndexed 参数序 + ARGB 字节序修复在 26.2 实证 |
+| Alpha 2（RHI 后端化） | 🚧 接口完成，后端 scaffold | 32 个 RHI 公共接口 + 9 个 26.2 GL 后端文件（stub） |
+| Alpha 3（光线 / 实体 / 机制） | 📋 计划中 | 参见 `ROADMAP_v26.md` |
+| Alpha 4（自研核心：LuminSR / LuminLang / LuminAnimation / 地形网格） | 📋 计划中 | 参见 `ROADMAP_v26.md` |
+| Alpha 5（DX12 + Metal 一等公民 + RHI 收敛） | 📋 计划中 | 26.2 已具备现代 RHI 抽象基础；DX12 native 集成和 Metal 桥接待规划 |
+| Alpha 4.5（3D 资产与 Demo 录制） | 📋 提案阶段 | 参见 `PROPOSALS.md` |
 
-### 2D Rendering
-- **Immediate Mode Renderer** - High-performance batched rendering
-  - Rectangles, rounded rectangles, triangles, shadows
-  - Texture rendering with LRU cache (256 entries)
-  - TTF font rendering with anti-aliasing
-  - Precise scissor coordinate transformation
-
-### 3D World Rendering
-- **World-Space Geometry** - Render in 3D world
-  - Filled/outline boxes
-  - Blur box effects
-  - Free-form line rendering
-
-### Shader System
-- **Complete GLSL Support**
-  - Gaussian blur shader (with rounded rect mask)
-  - FXAA anti-aliasing
-  - Color filter shader
-  - Procedural background effects (black hole, alien terrain, clouds)
-
-### Architecture
-- **LuminShot Platform Abstraction** - Cross-loader compatibility layer
-  - `LuminPlatform` interface
-  - `PlatformRegistry` registration mechanism
-  - Fabric and NeoForge 1.21.10 implementations (Modern GPU API)
-- **Ring Buffer GPU Management** - Dynamic capacity expansion
-- **Framebuffer Management** - Render target system
-
-## Installation
-
-### For Mod Developers
-
-1. Download `openlumin-fabric-1.21.10-v26.0-alpha.1.jar` from [releases](releases/v26.0-alpha.1)
-2. Add to your mod's `libs/` folder
-3. Add dependency in `build.gradle.kts`:
-
-```kotlin
-dependencies {
-    modImplementation(files("libs/openlumin-fabric-1.21.10-v26.0-alpha.1.jar"))
-}
-```
-
-### For Testing
-
-1. Download both jars from [releases](releases/v26.0-alpha.1):
-   - `openlumin-fabric-1.21.10-v26.0-alpha.1.jar` (library)
-   - `openlumin-testmod-fabric-1.21.10-v26.0-alpha.1.jar` (test mod)
-2. Place both in your Minecraft `mods/` folder
-3. Launch game - see 11 test elements in top-right corner
-
-## Quick Start
-
-### 2D Rendering
-
-```java
-import io.github.openlumin.schedulers.render2d.Render2DScheduler;
-import java.awt.Color;
-
-// Get scheduler instance
-Render2DScheduler scheduler = new Render2DScheduler();
-var layer = scheduler.layer(0);
-
-// Add rounded rectangle
-layer.addRoundRect(10, 10, 100, 50, 5, Color.WHITE);
-
-// Add gradient text
-layer.addGradientText("OpenLumin", 10, 70, 1.0f, 
-    Color.ORANGE, Color.CYAN, fontLoader);
-
-// Flush to screen
-scheduler.flushAndClear();
-```
-
-### 3D Rendering
-
-```java
-import io.github.openlumin.schedulers.render3d.Render3DScheduler;
-import net.minecraft.world.phys.AABB;
-
-// Add outline box around player
-AABB box = player.getBoundingBox();
-Render3DScheduler.INSTANCE.addOutlineBox(box, 0xFFFF0000, 2.0f);
-
-// Add RGB axes
-Vec3 center = player.position();
-Render3DScheduler.INSTANCE.addLine(center, center.add(3, 0, 0), Color.RED, 1.5f);
-```
-
-## Project Structure
+## 仓库结构 / Repository Structure
 
 ```
 OpenLumin/
-├── fabric-1.21.10/          # 1.21.10 OpenGL business-code baseline
-├── fabric-26.1.2/           # Fabric 26.1.2 rendering baseline (build+load verified)
-├── fabric-26.2/             # Fabric 26.2 Vulkan baseline (build+load verified)
-├── fabric-1.21.4/           # Fabric 1.21.4 (Legacy OpenGL reference)
-├── neoforge-1.21.10/        # NeoForge adapter reusing the 1.21.10 baseline
-├── neoforge-26.1.2/         # NeoForge 26.1.2 adapter (build+load verified)
-├── neoforge-26.2/           # NeoForge 26.2 adapter (build+load verified)
-├── neoforge-1.21.4/         # NeoForge 1.21.4 (Legacy reference)
-├── openlumin-testmod/       # Test mod (separate project)
-└── releases/                # Release packages
+├── fabric-26.1.2/                 # 1.21.10 业务代码基底（GL 路径，OpenGL 4.1+）
+├── fabric-26.2/                   # 26.2 Fabric 模块（GL + Vulkan via MC 26.2 GpuDevice）
+├── neoforge-1.21.10/              # 1.21.10 NeoForge 模块
+├── neoforge-26.1.2/               # 26.1.2 NeoForge 模块
+├── neoforge-26.2/                 # 26.2 NeoForge 模块
+├── openlumin-testmod/             # 1.21.10 单独测试模组（fabric + neoforge 子模块）
+├── _refers/                       # 本地参考项目克隆（sodium, iris, modernui, arc3d, ...）— gitignored
+├── docs/                          # 设计文档 + 路线图 + 提案
+│   ├── RHI_DESIGN.md              # 渲染硬件抽象设计
+│   ├── ROADMAP_v26.md             # v26.0 战略路线图
+│   └── PROPOSALS.md               # 生态提案（BlockBuster / 模型 / Demo 录制）
+├── .github/                       # GitHub 模板（PR / Issue / CODEOWNERS）
+├── .devres/                       # 本地 Agent 工作区模板（gitignored）
+├── CHANGELOG.md                   # 发布历史
+├── sync-gradle-to-m2.sh           # maven 缓存 SSL 问题绕过脚本
+└── memory/                        # 项目知识库（gitignored；本地维护）
 ```
 
-## Architecture
+## 分支策略 / Branching
 
-### LuminShot Platform Abstraction Layer
+- `main` — 受保护 / 只读历史
+- `fabric-1.21.10` — 1.21.10 维护线（v26.0-alpha.1 已发布）
+- `v26.0` — v26.0 主开发线（包含 1.21.10 + 26.1.2 + 26.2 + Alpha 2 起的所有 26.x 工作）
+- `v26.0-26.2` — 26.2 专用子线（Phase B 后端稳定化 + 26.2 Release 候选）
 
-```
-┌─────────────────────────────────────┐
-│  OpenLumin Business Layer           │
-│  (Lumin2D, Lumin3D, Shaders, etc.)  │
-└─────────────────────────────────────┘
-                ↓↑
-┌─────────────────────────────────────┐
-│  LuminShot Platform (Abstract)      │
-│  - getDevice()                      │
-│  - getDynamicUniforms()             │
-│  - writeTransform()                 │
-│  - resolveColorView/DepthView()     │
-└─────────────────────────────────────┘
-                ↓↑
-┌─────────────────────────────────────┐
-│  Platform Implementations           │
-│  - Fabric1210Platform (Modern API)  │
-│  - NeoForge1210Platform (Modern API)│
-│  - Fabric1214Platform (Legacy GL)   │
-└─────────────────────────────────────┘
-```
+详见 `docs/ROADMAP_v26.md` 与 `.github/PULL_REQUEST_TEMPLATE.md`。
 
-## Version Support
+## 贡献 / Contributing
 
-| Minecraft | Fabric | NeoForge | Status |
-|-----------|--------|----------|--------|
-| 1.21.10   | ✅      | ✅        | Alpha 1 complete |
-| 1.21.4    | ✅      | ✅        | Reference |
-| 26.1.2    | ✅      | ✅        | Build+load verified; in-game rendering pending |
-| 26.2      | ✅      | ✅        | Build+load verified; Vulkan baseline, rendering pending |
+按技能规范 `bc-developmentndebugging`：
 
-Forge is not supported for Minecraft 1.21.x or newer. OpenLumin focuses its modern product line on Fabric and NeoForge.
+- 每个主版本独立分支
+- 中文 commit message 短标题 + 详情，必要时英文
+- SSH 签名（`commit.gpgsign=true`）
+- 新增代码 / 文档每约 50 行加水印：`// GitHub@NDBlockConnect | BlockConnect@StarsailsClover`
+- 详情见 `.github/PULL_REQUEST_TEMPLATE.md`
 
-## Development Roadmap
+## 关联项目 / Related Projects
 
-- **Alpha 1** 🔄 - Basic LuminGraphics API across 1.21.10, 26.1.2, and 26.2 on Fabric and NeoForge
-- **Alpha 2** 🔜 - Performance optimization (Sodium/Iris research)
-- **Alpha 3** 🔜 - Advanced lighting, entity rendering
-- **Alpha 4** 🔜 - Replace Sodium/Iris/Optifine
-- **Alpha 5+** 🔜 - v26.0 stable release
+- [EpsilonBC](https://github.com/NekoyaHouse/Epsilon) — OpenLumin 的下游消费方
+- [ModernUI](https://github.com/BloCamLimb/ModernUI) / [Arc3D](https://github.com/BloCamLimb/Arc3D) — 架构参照（LGPL-3.0）
+- [Sodium](https://github.com/CaffeineMC/sodium) / [Embeddium](https://github.com/FiniteReality/embeddium) / [Iris](https://github.com/IrisShaders/Iris) — 渲染超集对标
+- [Geckolib](https://github.com/bernie-g/geckolib) — 骨骼动画参考
+- [superresolution](https://github.com/IReallyWantToSleep/superresolution) — 超分算法参数参考（仅协议，不集成）
+- [Project-Crystal-Fracture](https://github.com/Hismeo/Project-Crystal-Fracture) — 下游 showcase 候选
 
-## Documentation
+## 许可 / License
 
-- [Release Notes](releases/v26.0-alpha.1/RELEASE_NOTES.md)
-- [Project Knowledge Base (Chinese)](memory/FACT.md)
-- [API Design](docs/API_DESIGN.md)
-- [Migration Guide](VERSION_MIGRATION.md)
+TBD（v26.0 正式版前定稿）
 
-## Contributing
+---
 
-Contributions are welcome! Please submit issues and pull requests.
-
-## License
-
-This project is licensed under GPL-3.0-only. See [LICENSE](LICENSE) for details.
-
-## Acknowledgments
-
-Extracted from Epsilon HvH mod. Thanks to original authors Chen_Meng and 06789.
+<!-- GitHub@NDBlockConnect | BlockConnect@StarsailsClover -->

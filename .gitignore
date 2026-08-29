@@ -1,45 +1,44 @@
-.gradle/
+node_modules/
 build/
 out/
+.gradle/
+.idea/
+.vscode/
 *.iml
 *.ipr
 *.iws
-.idea/
+
+# 构建日志（通配）
 *.log
+build-*.log
+build_out.txt
+build_output.txt
+nf_*.log
+c.log
+c2.log
+b.log
 
-# 各模块的构建产物
-*/build/
-*/out/
-
-# 运行时目录
+# 运行时目录 / Run dirs
 run/
 runs/
-
-# Fabric 缓存
 .fabric/
 remappedSrc/
-
-# NeoForge/Forge 缓存
 .mixin.out/
 
-# macOS
+# OS 临时 / OS junk
 .DS_Store
-
-# Windows
 Thumbs.db
 desktop.ini
-
-# 临时文件
 *.tmp
 *.bak
 *.swp
 *~
 
-# 用户特定配置
-.vscode/
+# 用户特定配置 / User-specific
 *.code-workspace
+.vscode/
 
-# Agent/AI 工作区文件（不应提交）
+# Agent / AI 工作区文件（不提交）
 SOUL.md
 USER.md
 memory/
@@ -49,21 +48,21 @@ memory/
 .opencode-data/
 .trae/
 
-# AI 生成的文档
-PROGRESS.md
-IMPLEMENTATION_STATUS.md
+# 本仓库的"工作区"目录（每个 Agent 启动时按需初始化；本地 dev 工作区）
+# Local devres workspace (initialized per-agent; never tracked)
+.devres/
 
-# 误提取到根目录的编译产物
+# 本地参考项目克隆（按 ROADMAP_v26.md 列出，按需 clone；本地）
+# Local reference clones (per ROADMAP_v26.md, on-demand; local only)
+_refers/
+
+# 散落根目录的构建产物 / Stray root-level build outputs
 net/
 com/
 
-# 构建日志
-build_out.txt
-build_output.txt
-
-# 临时迁移脚本
-migrate_shim*.py
-restore_stubs.py
+# AI 生成的中间文档 / AI-generated intermediate docs
+PROGRESS.md
+IMPLEMENTATION_STATUS.md
 NEOFORGE_IMPLEMENTATION_PLAN.md
 PROGRESS_SUMMARY.md
 *_SUMMARY.md
@@ -74,11 +73,12 @@ ARCHITECTURE.md
 BUILD_STATUS.md
 CODE_ISOLATION.md
 
-# 临时脚本和分析文件
+# 临时脚本和分析 / Temp scripts & analysis
 analyze-dependencies.py
 build-phase1.sh
 generate-modules.py
 dependency-analysis.txt
-
-# 参考项目仓库（独立 clone，不提交）
-_refers/
+build_out.txt
+build_output.txt
+migrate_shim*.py
+restore_stubs.py
