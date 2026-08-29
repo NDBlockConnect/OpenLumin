@@ -1,0 +1,24 @@
+# CODEOWNERS
+# OpenLumin v26.0 仓库默认审查者
+# Default reviewers for the OpenLumin v26.0 repository.
+
+# 所有路径默认审查者
+# Default reviewers for all paths
+*          @NDBlockConnect/maintainers
+
+# 渲染硬件抽象 (RHI) 设计 + 后端
+# Render Hardware Interface design + backends
+/docs/RHI_DESIGN.md                @NDBlockConnect/rhi
+/fabric-26.2/src/main/java/io/github/openlumin/rhi/  @NDBlockConnect/rhi
+/neoforge-26.2/src/main/java/io/github/openlumin/rhi/  @NDBlockConnect/rhi
+
+# 平台模块（fabric / neoforge 入口）
+# Loader entry modules
+/fabric-*/src/main/java/io/github/openlumin/OpenLuminFabric*.java  @NDBlockConnect/loaders
+/neoforge-*/src/main/java/io/github/openlumin/OpenLuminNeoForge*.java  @NDBlockConnect/loaders
+
+# 文档 / 路线图
+# Documentation / roadmap
+/docs/                             @NDBlockConnect/docs
+/CHANGELOG.md                     @NDBlockConnect/docs
+/ROADMAP_v26.md                   @NDBlockConnect/docs
