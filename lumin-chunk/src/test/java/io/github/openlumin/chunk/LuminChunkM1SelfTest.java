@@ -24,7 +24,13 @@ public final class LuminChunkM1SelfTest {
         void run() throws Exception;
     }
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
+        System.exit(runAll() == 0 ? 0 : 1);
+    }
+
+    /** 运行 M1 全部测试节，返回失败节数（可被 M2 聚合运行器复用）。 */
+    public static int runAll() {
+        failures = 0;
         section("mesh correctness", LuminChunkM1SelfTest::testMeshCorrectness);
         section("fan-out completion", LuminChunkM1SelfTest::testFanOutCompletion);
         section("important priority", LuminChunkM1SelfTest::testImportantPriority);
@@ -34,11 +40,7 @@ public final class LuminChunkM1SelfTest {
         section("busy tracker math", LuminChunkM1SelfTest::testBusyTrackerMath);
         section("busy fraction range", LuminChunkM1SelfTest::testBusyFractionRange);
         section("queue empty and shutdown", LuminChunkM1SelfTest::testQueueEmptyAndShutdown);
-        if (failures > 0) {
-            System.err.println("[lumin-chunk M1] " + failures + " section(s) FAILED");
-            System.exit(1);
-        }
-        System.out.println("[lumin-chunk M1] ALL SELF TESTS PASSED");
+        return failures;
     }
 
     private static void section(String name, Section body) {

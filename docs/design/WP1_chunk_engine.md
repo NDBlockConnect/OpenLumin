@@ -2,7 +2,8 @@
 
 # WP-1 Design Draft: Chunk Engine Integration Layer (LuminChunk)
 
-> 状态：M1 已实现（2026-08-31，lumin-chunk/ 模块，纯 CPU 自测通过）· 参照：`_refers/sodium`（compile/executor/render）·
+> 状态：M1 已实现（2026-08-31，lumin-chunk/ 模块，纯 CPU 自测通过）· M2 已实现（2026-08-31，
+> Store 账本层入 lumin-chunk + 26.1.2 GPU 层三件套）· 参照：`_refers/sodium`（compile/executor/render）·
 > GitHub@NDBlockConnect | BlockConnect@StarsailsClover
 
 ---
@@ -98,6 +99,30 @@ public final class LuminSectionRenderer {
   一起定形；契约补充：`isQueueEmpty()`=无排队任务（不含正在执行的），consumer 在完成信号之后
   于 Worker 线程异步回调（await 不保证 consumer 已返回），取消的已构建产出由构建器代为关闭。
 - **M2**：Store 层 + Render 层（26.1.2 基线先行，26.2 跟进）；与 LuminRenderTarget/后处理链集成。
+  **✅ 核心已实现（2026-08-31）**：
+  - **Store 账本层（lumin-chunk，纯 CPU 零 GPU 依赖）**：`store/LuminRegionAllocator`
+    （first-fit 空闲链分配器：对齐/拆块/前后合并/统计，空间不足返回 -1——扩容决策留给持有方）、
+    `store/LuminChunkStoreLedger`（regionKey→分配器对 + acquire 幂等/retire 幂等/retire 后
+    acquire 同 key=重建）、`store/LuminSectionAllocation`（槽位 record）。自测 4 节并入
+    `LuminChunkM2SelfTest`（聚合 M1 回归），javac 连跑全绿。
+  - **26.1.2 GPU 层（fabric-26.1.2 新增 io.github.openlumin.chunk 包）**：
+    `LuminSectionDraw`（不可变绘制数据包）、`LuminSectionRenderer`（**drawIndexed 唯一出口**，
+    javadoc 载双基线参数序对照表）、`LuminChunkStore`（regionKey→vertex/index GpuBuffer 对 +
+    map 写入上传（LuminRingBuffer 同款路径）+ 槽位分配/归还 + retire 立即销毁；容量不足抛出，
+    不自动扩容——重放属游戏侧边界）。
+  - **工程接线**：lumin-chunk 经 `:lumin-chunk:publishToMavenLocal` 分发（artifactId
+    OpenLumin-lumin-chunk），fabric-26.1.2 加 mavenLocal() 仓库 + implementation 依赖。
+  - **⚠️ 26.1.2 drawIndexed/draw 真实签名（javap 字节码实证，本轮核实）**：
+    `drawIndexed(baseVertex, firstIndex, indexCount, instanceCount)`、
+    `draw(firstVertex, vertexCount)`（instanceCount 恒 1）。证据链：GuiRenderer 压栈序
+    (baseVertex, 0, indexCount, 1) → GlRenderPass 转发 → GlCommandEncoder.drawFromBuffers 四分支
+    GL 消费（glDrawElementsInstancedBaseVertex(count, first×indexBytes, baseVertex, instances) /
+    _drawArrays(mode, a, c)）。与 26.2 序差异巨大（26.2=drawIndexed(indexCount, instanceCount,
+    firstIndex, baseVertex, baseInstance)）——单点封装必要性实证。另发现 26.1.2 已有
+    `drawMultipleIndexed`（M3 多 draw 的 API 面现成）。
+  - **待办**：游戏内渲染验证（需 mdl+Despotes 全链路，本轮未做）；26.2 Store/Render 层跟进；
+    `:lumin-chunk:publishToMavenLocal` 与 fabric-26.1.2 `compileJava` 的 Gradle 全链路复验
+    （本轮内存窗口不足，手工 javac+jar 验证通过、mavenLocal 产物手工构造）。
 - **M3**：多 draw/indirect、遮挡剔除接口、半透明排序（Sodium BSP 参照）。
 
 ## 6. 审计锚点（D7）
