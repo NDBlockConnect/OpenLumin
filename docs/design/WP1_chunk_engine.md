@@ -2,7 +2,7 @@
 
 # WP-1 Design Draft: Chunk Engine Integration Layer (LuminChunk)
 
-> 状态：设计草案 v0.1 · 参照：`_refers/sodium`（compile/executor/render）·
+> 状态：M1 已实现（2026-08-31，lumin-chunk/ 模块，纯 CPU 自测通过）· 参照：`_refers/sodium`（compile/executor/render）·
 > GitHub@NDBlockConnect | BlockConnect@StarsailsClover
 
 ---
@@ -85,6 +85,18 @@ public final class LuminSectionRenderer {
 
 - **M1（Alpha 2）**：Build 层 API + 单线程参考实现 + 单元测试（网格生成正确性、取消语义、
   队列节流）——纯 CPU，不触 GPU，规避环境性验证风险。
+  **✅ 已实现（2026-08-31）**：`lumin-chunk/` 模块（根工程子项目，零 MC 依赖，Java 21）。
+  交付：`LuminChunkBuilder`（N Worker + 全局 important 队列 + 轮转派发 + 队尾窃取 + 忙碌度节流 +
+  优雅停机 drain）、`LuminChunkTask`/`LuminBuildOutput`/`LuminBuildContext`/`LuminChunkJob`/
+  `LuminChunkJobResult`、`CancellationToken`、`BusyTracker`（时间戳账本，合成时间可单测）。
+  自测：`LuminChunkM1SelfTest`（9 节，零依赖运行器，`gradlew :lumin-chunk:selfTest` 或
+  `java -cp` 直接跑）覆盖网格正确性/扇出窃取/important 优先/排队取消/构建中取消/失败隔离/
+  BusyTracker 数学/忙碌度范围/停机排空，连续 10 轮全绿。
+  **与草案 v0.1 的偏差（记录在案）**：`scheduleTask` 签名简化为 `<O> scheduleTask(LuminChunkTask<O>,
+  boolean, Consumer<LuminChunkJobResult<O>>)`（草案的 `<T extends LuminChunkTask<O>, O>` 对 lambda
+  推断不友好且无增益）；构造器暂为 `(int threads)`，`LuminVertexType` 类型化推迟到 M2 随 Store 层
+  一起定形；契约补充：`isQueueEmpty()`=无排队任务（不含正在执行的），consumer 在完成信号之后
+  于 Worker 线程异步回调（await 不保证 consumer 已返回），取消的已构建产出由构建器代为关闭。
 - **M2**：Store 层 + Render 层（26.1.2 基线先行，26.2 跟进）；与 LuminRenderTarget/后处理链集成。
 - **M3**：多 draw/indirect、遮挡剔除接口、半透明排序（Sodium BSP 参照）。
 

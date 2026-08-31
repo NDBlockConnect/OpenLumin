@@ -38,6 +38,9 @@ include("neoforge-1.21.10")  // 复用 fabric-1.21.10 业务代码
 include("fabric-1.21.4")     // 完整 OpenGL 实现参考
 include("neoforge-1.21.4")   // 完整 OpenGL 实现参考
 
+// WP-1 区块引擎接入层（纯 CPU 库模块，零 Minecraft 依赖，详见 docs/design/WP1_chunk_engine.md）
+include("lumin-chunk")
+
 // ========================================
 // 其他版本已移至独立分支
 // ========================================
