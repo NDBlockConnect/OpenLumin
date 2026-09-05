@@ -131,6 +131,8 @@ public final class LuminSectionRenderer {
   - **待办**：游戏内渲染验证（需 mdl+Despotes 全链路；mdl 测试实例已被清理需重建）。
     （Gradle 全链路 publishToMavenLocal + 26.1.2/26.2 compileJava 已于 2026-09-01 复验全绿。）
 - **M3**：多 draw/indirect、遮挡剔除接口、半透明排序（Sodium BSP 参照）。
+  **设计草案已产出（2026-09-01）**：`docs/design/WP1_M3_design.md`（批量提交双基线路径 /
+  三级可见性遮挡接口 / BSP 半透明排序 / NVIDIA 技术缝：Reflex 低延迟·DLSS-D·RT 定位）。
 
 ## 6. 审计锚点（D7）
 
