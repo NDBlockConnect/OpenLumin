@@ -2,8 +2,9 @@
 
 # WP-1 Design Draft: Chunk Engine Integration Layer (LuminChunk)
 
-> 状态：M1 已实现（2026-08-31，lumin-chunk/ 模块，纯 CPU 自测通过）· M2 已实现（2026-08-31，
-> Store 账本层入 lumin-chunk + 26.1.2 GPU 层三件套）· 参照：`_refers/sodium`（compile/executor/render）·
+> 状态：M1 已实现（2026-08-31，lumin-chunk/ 模块，纯 CPU 自测通过）· M2 已实现（2026-08-31/09-01，
+> Store 账本层入 lumin-chunk + 26.1.2/26.2 双基线 GPU 层，Gradle 全链路编译验证通过）·
+> 参照：`_refers/sodium`（compile/executor/render）·
 > GitHub@NDBlockConnect | BlockConnect@StarsailsClover
 
 ---
@@ -120,9 +121,15 @@ public final class LuminSectionRenderer {
     _drawArrays(mode, a, c)）。与 26.2 序差异巨大（26.2=drawIndexed(indexCount, instanceCount,
     firstIndex, baseVertex, baseInstance)）——单点封装必要性实证。另发现 26.1.2 已有
     `drawMultipleIndexed`（M3 多 draw 的 API 面现成）。
-  - **待办**：游戏内渲染验证（需 mdl+Despotes 全链路，本轮未做）；26.2 Store/Render 层跟进；
-    `:lumin-chunk:publishToMavenLocal` 与 fabric-26.1.2 `compileJava` 的 Gradle 全链路复验
-    （本轮内存窗口不足，手工 javac+jar 验证通过、mavenLocal 产物手工构造）。
+  - **26.2 GPU 层（fabric-26.2 同包名对称实现，2026-09-01）**：差异点逐项 javap 核实后落地——
+    `LuminSectionDraw` 收 `GpuBufferSlice` + 顶层 `com.mojang.blaze3d.IndexType`；
+    `LuminSectionRenderer.drawSection` 以 26.2 序提交
+    `drawIndexed(indexCount, 1, firstIndex, baseVertex, 0)`；`LuminChunkStore` 上传走
+    `GpuBufferSlice.map`（26.2 重构路径，非 encoder.mapBuffer）。javac + loom compileJava
+    （Gradle 9.7.0 + Loom 1.18，daemon JVM 25）双绿。另实证 26.2 vanilla 已有
+    `multiDrawIndexed`/`drawIndexedIndirect`/`multiDraw`/`drawIndirect`（M3 批量路径候选面）。
+  - **待办**：游戏内渲染验证（需 mdl+Despotes 全链路；mdl 测试实例已被清理需重建）。
+    （Gradle 全链路 publishToMavenLocal + 26.1.2/26.2 compileJava 已于 2026-09-01 复验全绿。）
 - **M3**：多 draw/indirect、遮挡剔除接口、半透明排序（Sodium BSP 参照）。
 
 ## 6. 审计锚点（D7）
