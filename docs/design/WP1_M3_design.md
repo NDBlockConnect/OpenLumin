@@ -25,36 +25,41 @@
 
 | API | 26.1.2 | 26.2 | 备注 |
 |---|---|---|---|
-| `RenderPass.drawMultipleIndexed` | ✅ `Collection<Draw<T>>, GpuBuffer, IndexType, Collection<String>, T` | ✅ 同签名 | 聚合多 draw，`Draw` record 含 `slot/vertexBuffer/indexBuffer/indexType/firstIndex/indexCount/baseVertex` + **per-draw uniform 上传钩子**（`BiConsumer<T, UniformUploader>`） |
-| `RenderPass.multiDrawIndexed` | ❌ | ✅ `(IntBuffer, int, int, int)` + `(PointerBuffer, IntBuffer, IntBuffer, int)` | IntBuffer 各参数槽位语义**实现期 javap 压实**（铁律） |
-| `RenderPass.drawIndexedIndirect` | ❌ | ✅ `(GpuBufferSlice, int)` | indirect 通路（Vulkan 基线原生） |
+| `RenderPass.drawMultipleIndexed` | ✅ `Collection<Draw<T>>, GpuBuffer, IndexType, Collection<String>, T` | ✅ 同签名 | 聚合多 draw，`Draw` record 双基线同构（`slot`=顶点槽位/`vertexBuffer`=**整 buffer**/`indexBuffer`/`indexType`/`firstIndex`/`indexCount`/`baseVertex` + per-draw uniform 钩子 `BiConsumer<T, UniformUploader>`）；**26.2 注意：Draw 不接受 slice，整 buffer 绑定需 baseVertex 折算 slice 偏移** |
+| `RenderPass.multiDrawIndexed` | ❌ | ✅ `(IntBuffer, int, int, int)` + `(PointerBuffer, IntBuffer, IntBuffer, int)` | **实证（javap）**：单 IntBuffer 重载 = interleaved direct 特性，GL 后端直接抛 `UnsupportedOperationException`（仅 Vulkan）；三缓冲重载 = `(firstIndex 偏移数组, counts, baseVertices, 统一 instanceCount)`，GL 经 `executeDraws` 可用 |
+| `RenderPass.drawIndexedIndirect` | ❌ | ✅ `(GpuBufferSlice, int)` | indirect 通路（26.2 GL+Vulkan 双后端均有实现） |
 | `RenderPass.multiDraw` / `drawIndirect` | ❌ | ✅ | 非索引对应物 |
 | 后端覆盖 | GL（GlRenderPass） | GL + Vulkan 双实现 | 批量路径双后端可用 |
 
-**结论**：M3 的批量提交在两基线都有 vanilla 原生通路，无需自建命令缓冲；
-26.2 的 indirect/multiDraw 额外构成 GPU 驱动渲染（GPU-driven）的演进候选。
+**结论**：M3a 主路径统一 `drawMultipleIndexed`（双基线双后端全可用，语义可预期）；
+26.2 的 `multiDrawIndexed`（三缓冲重载）与 `drawIndexedIndirect` 为性能优化候选路径
+（需后端 capability 探测，M3a+ 评估）；26.2 的 indirect/multiDraw 额外构成 GPU 驱动
+渲染（GPU-driven）的演进候选。
+
+**M3a 实现状态（2026-09-01，双基线四重验证全绿：javac ×2 + loom compileJava ×2）**：
+- 双基线新增 `LuminSectionBatch`（record：draws 列表 + sharedIndexBuffer/sharedIndexType
+  自动判定）与 `LuminSectionRenderer.drawSectionsBatched`（drawMultipleIndexed 主路径）；
+  逐 draw 路径保留为回退（`drawSections`/`drawSection`）。
+- 26.2 的 `LuminSectionDraw` 增补 `strideBytes` 字段：批量通路把 slice 偏移按 stride
+  折算进 baseVertex（偏移不对齐 stride 时抛 IAE）；单 draw 的 slice 精确绑定不受影响。
 
 ## 3. 子系统设计 / Subsystem Design
 
-### 3a. 批量提交（Multi-Draw Batch Submission）
+### 3a. 批量提交（Multi-Draw Batch Submission）✅ 已实现（M3a，2026-09-01）
 
 ```java
-// LuminSectionRenderer 扩展（单点出口原则不变）
-public final class LuminSectionBatch {
-    List<LuminSectionDraw> draws();          // M2 的 LuminSectionDraw 扩展 per-draw uniform 钩子
-    GpuBuffer sharedIndexBuffer();           // 同 region 共享 IBO 时非 null
-    IndexType indexType();
-}
-public void drawSectionsBatched(RenderPass pass, LuminSectionBatch batch);
+// 双基线 LuminSectionRenderer 扩展（单点出口原则不变；26.2 版 LuminSectionDraw 含 strideBytes）
+public record LuminSectionBatch(List<LuminSectionDraw> draws) { /* sharedIndexBuffer/Type 自动判定 */ }
+public void drawSectionsBatched(RenderPass pass, LuminSectionBatch batch);  // drawMultipleIndexed 主路径
+public void drawSections(RenderPass pass, List<LuminSectionDraw> draws);    // 逐 draw 回退（保留）
 ```
 
-- **26.1.2 路径**：`drawMultipleIndexed`——`LuminSectionDraw` 增补可选 uniform 钩子字段，
-  映射到 vanilla `Draw` record；共享 IBO 时单次 setIndexBuffer。
-- **26.2 路径**：优先 `multiDrawIndexed`（firstIndex/baseVertex 列表 → IntBuffer），
-  per-draw uniform 异构场景回退 `drawMultipleIndexed`；语义压实后定稿。
-- **回退链**：批量 API → 逐 draw 循环（M2 路径），单点开关。
-- **批次构建**：region 分组 + 索引缓冲共享判定 + 材质/管线分桶（衔接 Render2DScheduler
-  的既有合批思路）。
+- **主路径**：`drawMultipleIndexed`（26.1.2 唯一批量通路；26.2 同）——per-draw 绑定与
+  uniform 上传在 vanilla 循环内完成，省 Java 层调用栈；IBO/IndexType 混用批次由
+  vanilla 逐 draw 重绑，语义与逐 draw 等价。
+- **26.2 slice 折算**：vanilla Draw 整 buffer 绑定，`baseVertex' = sliceOffset/stride + baseVertex`。
+- **后续优化路径（未实现）**：26.2 `multiDrawIndexed` 三缓冲重载（需 GL/Vulkan capability
+  探测——GL 的 interleaved 重载抛异常）、`drawIndexedIndirect`（GPU-driven 演进）。
 
 ### 3b. 遮挡剔除接口（Occlusion Culling，Sodium OcclusionCuller 语义参照）
 

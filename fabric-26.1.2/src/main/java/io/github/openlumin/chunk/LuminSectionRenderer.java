@@ -4,6 +4,7 @@ import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.vertex.VertexFormat;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -40,6 +41,26 @@ public final class LuminSectionRenderer {
         for (LuminSectionDraw draw : draws) {
             drawSection(pass, draw);
         }
+    }
+
+    /**
+     * 批量绘制：走 vanilla {@code drawMultipleIndexed} 聚合通路
+     * （逐 draw 的 VBO/IBO 绑定与 uniform 上传由 vanilla 循环内完成，省 Java 层调用栈）。
+     * 批次内 IBO/IndexType 不一致时 vanilla 逐 draw 重绑，语义与逐 draw 等价。
+     *
+     * @throws UnsupportedOperationException 后端不提供批量通路时（调用方可回退
+     *                                      {@link #drawSections(RenderPass, List)}）
+     */
+    public void drawSectionsBatched(RenderPass pass, LuminSectionBatch batch) {
+        List<LuminSectionDraw> draws = batch.draws();
+        List<RenderPass.Draw<Object>> vanillaDraws = new ArrayList<>(draws.size());
+        for (LuminSectionDraw draw : draws) {
+            vanillaDraws.add(new RenderPass.Draw<>(
+                    0, draw.vertexBuffer(), draw.indexBuffer(), draw.indexType(),
+                    draw.firstIndex(), draw.indexCount(), draw.baseVertex()));
+        }
+        pass.drawMultipleIndexed(vanillaDraws, batch.sharedIndexBuffer(),
+                batch.sharedIndexType(), null, null);
     }
 
     private static void setIndexBuffer(RenderPass pass, GpuBuffer indexBuffer, VertexFormat.IndexType indexType) {
