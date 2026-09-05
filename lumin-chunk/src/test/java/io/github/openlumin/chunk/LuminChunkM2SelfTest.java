@@ -18,16 +18,17 @@ public final class LuminChunkM2SelfTest {
     }
 
     public static void main(String[] args) {
+        System.exit(runAll() == 0 ? 0 : 1);
+    }
+
+    /** 运行 M2 全部测试节（先聚合 M1 回归），返回失败节数（可被 M3 聚合运行器复用）。 */
+    public static int runAll() {
         failures = LuminChunkM1SelfTest.runAll();
         section("allocator first-fit and alignment", LuminChunkM2SelfTest::testFirstFitAndAlignment);
         section("allocator free coalescing", LuminChunkM2SelfTest::testFreeCoalescing);
         section("allocator exhaustion and stats", LuminChunkM2SelfTest::testExhaustionAndStats);
         section("ledger lifecycle idempotence", LuminChunkM2SelfTest::testLedgerLifecycle);
-        if (failures > 0) {
-            System.err.println("[lumin-chunk M2] " + failures + " section(s) FAILED");
-            System.exit(1);
-        }
-        System.out.println("[lumin-chunk M2] ALL SELF TESTS PASSED (M1 + M2)");
+        return failures;
     }
 
     private static void section(String name, Section body) {

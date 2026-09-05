@@ -61,7 +61,7 @@ public void drawSections(RenderPass pass, List<LuminSectionDraw> draws);    // �
 - **后续优化路径（未实现）**：26.2 `multiDrawIndexed` 三缓冲重载（需 GL/Vulkan capability
   探测——GL 的 interleaved 重载抛异常）、`drawIndexedIndirect`（GPU-driven 演进）。
 
-### 3b. 遮挡剔除接口（Occlusion Culling，Sodium OcclusionCuller 语义参照）
+### 3b. 遮挡剔除接口（Occlusion Culling，Sodium OcclusionCuller 语义参照）✅ 已实现（M3b，2026-09-01）
 
 Sodium 模型提炼（源码研读，零拷码）：
 - **三级可见性**：frustum visible ⊃ regular visible ⊃ wide visible（严格蕴含链，反向不成立）；
@@ -74,22 +74,31 @@ OpenLumin 纯库化 API 草案：
 
 ```java
 public interface LuminSectionVisibilityGraph {
-    // 消费方提供：section 邻接表 + 方向对可见位（方块遮挡图的游戏侧抽象）
-    long visibilityBits(long sectionKey);            // 6 邻方向可见位掩码
-    boolean exists(long sectionKey);
+    // 消费方提供：section 存在性 + 6 方向遍历位（方块遮挡图的游戏侧抽象，需线程安全）
+    boolean exists(LuminSectionPos pos);
+    long visibilityBits(LuminSectionPos pos);        // 6 位：bit d = 沿方向 d 连通
 }
-public final class LuminOcclusionCuller implements AutoCloseable {
-    public LuminOcclusionCuller(LuminSectionVisibilityGraph graph, int threads);
+public final class LuminOcclusionCuller {
+    public LuminOcclusionCuller(LuminSectionVisibilityGraph graph);   // 单线程 BFS（Sodium 同款）
     public LuminCullResult cull(LuminCullRequest request, CancellationToken cancel);
-    // LuminCullRequest: 相机/视口/搜索距离（regular|local 分级）/是否启用遮挡剔除
-    // LuminCullResult: 可见 section 集（frustum 标记位）+ 遍历统计
+    // LuminCullRequest: 相机 section/视锥桥接/半径/occlusionEnabled（false=纯视锥对照模式）
+    // LuminCullResult: 可见 section 集 + 遍历统计 + cancelled
 }
 ```
 
-- 复用 M1 `CancellationToken` 与 Worker 池模式；剔除线程与构建线程共享忙碌度节流。
+- 复用 M1 `CancellationToken`；**遍历为单线程 BFS**（Sodium 同款——其源码 TODO 亦将多线程
+  分区遍历列为未做，M3b 不做假并行；设计草案原 `threads` 参数撤销，多线程遍历列 M4 研究）。
+- **实现交付**（lumin-chunk `cull/` 包，纯 CPU 全量单测）：`LuminGraphDirection`（6 方向 +
+  opposite）、`LuminVisibilityEncoding`（36 位有向对编码 + 3 轴全遮挡对掩码 + 6 位遍历位）、
+  `LuminSectionPos`（21 位/轴打包，越界抛）、`LuminSectionVisibilityGraph`（消费方桥接：
+  exists + visibilityBits，要求线程安全）、`LuminFrustumTest`（视锥桥接）、`LuminCullRequest`
+  （相机/视锥/半径/开关）、`LuminCullResult`（可见集 + 遍历统计 + 取消标记）、
+  `LuminOcclusionCuller`（BFS：视锥失败不阻断扩展——相机身后仍是通路；取消逐迭代检查）。
+  自测 9 节入 `LuminChunkM3SelfTest`（聚合 M2+M1），javac 5/5 + Gradle selfTest 全绿；
+  期间修正 3 处测试断言/语义错（位编码差值、墙体层可达性、取消检查粒度）。
 - **衔接**：可见集 → 批次构建（3a 只为可见 section 生成 draw）→ 未可见 section 的
   Store 槽位可回收（retire 决策留消费方）。
-- 验收：对全量渲染的 draw call 削减率与 Sodium 同场景对齐（±5%）。
+- 验收：对全量渲染的 draw call 削减率与 Sodium 同场景对齐（±5%）——待游戏侧桥接后验证。
 
 ### 3c. 半透明排序（Translucent Sorting，Sodium translucent_sorting 语义参照）
 
