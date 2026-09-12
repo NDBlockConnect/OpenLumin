@@ -220,6 +220,30 @@ M3 的职责是把区块渲染的帧内编排（批次序、pass 序）整理成
 **后续（M4b/M4c，原理见前调 §7）**：量化顶点格式定型（≤20 B/顶点）、arena 增量碎片整理与
 staging 环、多 draw 能力回退链（M5）、三级遮挡与 Morton 位树（M5）、半透明分类启发式（M6）。
 
+## 7. M4b 量化顶点格式（前调驱动的原理级提升，2026-09-12）
+
+> 依据前调 §7.5：顶点格式未压缩是带宽基本盘，Sodium 以 20 B/顶点（20 位量化位置 +
+> 15+1 位 UV）为基准。M4b 在纯 CPU 层定型该格式（编解码器 + 单测），26.x 基线的
+> shader 端反量化随 M5 GPU 层接入。
+
+**交付**（lumin-chunk `vertex/` 包）：
+- `LuminQuantizedVertexFormat`：布局常量与编解码工具。**20 字节/顶点 = 5 个 32 位字**：
+  word0/1 = 位置（section 局部 (8+v)/32 归一化，20 位/轴共 60 位拆两 word）；
+  word2 = RGBA8 颜色；word3 = 纹理（u/v 各 15 位 + 各 1 位渗色偏置符号）；
+  word4 = 光照（block/sky 各 8 位，钳制 [8,248]）+ material 8 位 + sectionIndex 8 位。
+  着色器反量化尺度 VERTEX_SCALE=32/2^20、偏移 −8。
+- `LuminVertexWriter`：quad 质心记录（`beginQuad`）+ 逐顶点编码（渗色偏置可自动按质心
+  判定或显式覆盖）。
+- `LuminVertexReader`：对称解码（测试与工具链用；GPU 端为 shader 反量化）。
+
+**实现期发现并修复的真实缺陷**：颜色分量打包用 `& 0xFF` **回绕**（300→44），
+正确语义是**饱和钳制** [0,255]——回绕会把过曝/负值变成随机色相。已改 clamp8。
+
+自测 5 节入 `LuminChunkM4bSelfTest`（往返精度/钳制语义/质心偏置/字节布局/步长计数），
+javac 5/5 + Gradle selfTest（M1..M4b 聚合）全绿。
+
+**后续（M4c，原理见前调 §7.4）**：arena 增量碎片整理与 staging 环。
+
 ---
 
 *GitHub@NDBlockConnect | BlockConnect@StarsailsClover*
