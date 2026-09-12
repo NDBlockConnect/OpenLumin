@@ -51,6 +51,10 @@ RHI 后端化是社区共识方向；OpenLumin 的 LuminPlatform 收敛应吸收
 
 ## 4. 能力矩阵（初判 → 深审待办）
 
+> **深审已完成（2026-09-12）**：五竞品原理级研读结果见
+> [`P0_superset_principles.md`](P0_superset_principles.md)（Sodium/Iris/OptiFine/SuperResolution/Nvidium
+> 原理清单 + 许可红线 + 超集矩阵 + 原理级提升要点）。本表"深审待办"列的结论已并入该文件 §6/§7。
+
 | 能力 | Sodium 参照 | Iris 参照 | OpenLumin 现状 | 深审待办 |
 |---|---|---|---|---|
 | 区块构建管线 | compile/* | — | ❌ | 读 compile/executor+pipeline，产出 WP-1 设计 |
