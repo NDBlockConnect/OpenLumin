@@ -23,8 +23,6 @@ import java.util.Set;
  */
 public final class LuminOcclusionCuller {
 
-    private static final int CANCEL_CHECK_INTERVAL = 256;
-
     private final LuminSectionVisibilityGraph graph;
 
     public LuminOcclusionCuller(LuminSectionVisibilityGraph graph) {
@@ -49,7 +47,8 @@ public final class LuminOcclusionCuller {
         List<LuminSectionPos> visible = new ArrayList<>();
         Set<Long> visited = new HashSet<>();
         ArrayDeque<LuminSectionPos> queue = new ArrayDeque<>();
-        int maxDistanceSquared = request.maxDistanceSections() * request.maxDistanceSections();
+        long maxDistance = request.maxDistanceSections();
+        long maxDistanceSquared = maxDistance * maxDistance;
 
         visited.add(origin.pack());
         queue.add(origin);

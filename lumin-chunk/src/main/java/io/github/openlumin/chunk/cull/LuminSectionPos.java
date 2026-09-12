@@ -41,10 +41,10 @@ public record LuminSectionPos(int x, int y, int z) {
         return (raw << (32 - FIELD_BITS)) >> (32 - FIELD_BITS);
     }
 
-    public int distanceSquaredTo(LuminSectionPos other) {
-        int dx = x - other.x;
-        int dy = y - other.y;
-        int dz = z - other.z;
+    public long distanceSquaredTo(LuminSectionPos other) {
+        long dx = (long) x - other.x;
+        long dy = (long) y - other.y;
+        long dz = (long) z - other.z;
         return dx * dx + dy * dy + dz * dz;
     }
 

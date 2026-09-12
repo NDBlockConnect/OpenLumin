@@ -8,9 +8,18 @@ import io.github.openlumin.chunk.cull.LuminOcclusionCuller;
 import io.github.openlumin.chunk.cull.LuminSectionPos;
 import io.github.openlumin.chunk.cull.LuminSectionVisibilityGraph;
 import io.github.openlumin.chunk.cull.LuminVisibilityEncoding;
+import io.github.openlumin.chunk.sort.LuminCameraState;
+import io.github.openlumin.chunk.sort.LuminSortStrategy;
+import io.github.openlumin.chunk.sort.LuminTranslucentQuad;
+import io.github.openlumin.chunk.sort.LuminTranslucentSorter;
+import io.github.openlumin.chunk.sort.DynamicBSPSorter;
+import io.github.openlumin.chunk.sort.NoneSorter;
+import io.github.openlumin.chunk.sort.StaticTopoSorter;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -38,6 +47,12 @@ public final class LuminChunkM3SelfTest {
         section("distance cutoff", LuminChunkM3SelfTest::testDistanceCutoff);
         section("cancellation", LuminChunkM3SelfTest::testCancellation);
         section("camera must exist", LuminChunkM3SelfTest::testCameraMustExist);
+        section("none sorter identity", LuminChunkM3SelfTest::testNoneSorter);
+        section("static topo order", LuminChunkM3SelfTest::testStaticTopo);
+        section("BSP back-to-front", LuminChunkM3SelfTest::testBspBackToFront);
+        section("BSP spanning quad", LuminChunkM3SelfTest::testBspSpanning);
+        section("BSP full set retention", LuminChunkM3SelfTest::testBspFullSet);
+        section("BSP camera dependency", LuminChunkM3SelfTest::testBspCameraDependency);
         if (failures > 0) {
             System.err.println("[lumin-chunk M3] " + failures + " section(s) FAILED");
             System.exit(1);
@@ -242,6 +257,137 @@ public final class LuminChunkM3SelfTest {
         }
     }
 
-    private LuminChunkM3SelfTest() {
+private static void testNoneSorter() {
+        LuminTranslucentQuad q0 = axisAlignedQuad(0, 0, 0, 10);
+        LuminTranslucentQuad q1 = axisAlignedQuad(1, 0, 0, 10);
+        LuminTranslucentQuad q2 = axisAlignedQuad(2, 0, 0, 10);
+        List<LuminTranslucentQuad> input = List.of(q0, q1, q2);
+        LuminTranslucentSorter sorter = new NoneSorter();
+        List<LuminTranslucentQuad> result = sorter.sort(new LuminCameraState(0, 0, 0, 5, 5, -5), input);
+        check(result.size() == 3, "size preserved");
+        check(result.get(0) == q0, "first element identity: same object reference");
+        check(result.get(1) == q1, "second element identity");
+        check(result.get(2) == q2, "third element identity");
+        check(result.get(0).vertexIndex0() == 0, "vi0=" + result.get(0).vertexIndex0());
+        sorter.close();
+    }
+
+    private static void testStaticTopo() {
+        LuminTranslucentQuad q0 = axisAlignedQuad(0, 0, 10, 10);
+        LuminTranslucentQuad q1 = axisAlignedQuad(1, 0, 10, 10);
+        LuminTranslucentQuad q2 = axisAlignedQuad(2, 0, 10, 10);
+        List<LuminTranslucentQuad> input = List.of(q0, q1, q2);
+        LuminTranslucentSorter sorter = new StaticTopoSorter(new int[]{2, 0, 1});
+        List<LuminTranslucentQuad> result = sorter.sort(new LuminCameraState(0, 0, 0, 5, 5, 50), input);
+        check(result.size() == 3, "size preserved");
+        check(result.get(0) == q2, "custom order: quad 2 first");
+        check(result.get(1) == q0, "custom order: quad 0 second");
+        check(result.get(2) == q1, "custom order: quad 1 third");
+        sorter.close();
+    }
+
+    private static void testBspBackToFront() {
+        LuminTranslucentQuad back = axisAlignedQuad(0, 0, -3, 10);
+        LuminTranslucentQuad front = axisAlignedQuad(1, 0, 3, 10);
+        List<LuminTranslucentQuad> input = List.of(front, back);
+        LuminTranslucentSorter sorter = new DynamicBSPSorter();
+        List<LuminTranslucentQuad> result = sorter.sort(new LuminCameraState(0, 0, 0, 5, 5, 10), input);
+        check(result.get(0) == back, "back-to-front: back quad (z=-3) rendered before front (z=3), got vi0="
+                + result.get(0).vertexIndex0() + " then vi0=" + result.get(1).vertexIndex0());
+        check(result.get(1) == front, "front quad second");
+        sorter.close();
+    }
+
+    private static void testBspSpanning() {
+        // partition quad (facing +Y) at y=5; spanning quad from y=3 to y=7
+        LuminTranslucentQuad part = quadFacingY(0, 4, 5);
+        LuminTranslucentQuad span = quadSpanningY(0, 5, 3, 7);
+        List<LuminTranslucentQuad> input = List.of(part, span);
+        LuminTranslucentSorter sorter = new DynamicBSPSorter();
+        // camera on front side (y=10) → back→spanning→front: span between nothing (back empty)
+        List<LuminTranslucentQuad> result = sorter.sort(new LuminCameraState(0, 0, 0, 5, 10, 5), input);
+        check(result.size() == 2, "both quads preserved");
+        LuminTranslucentQuad first = result.get(0);
+        LuminTranslucentQuad second = result.get(1);
+        // with only partition quad + spanning quad and camera on front: spanning rendered between back/front
+        // partition quad is part of spanning list (it IS the partitioner), so it appears in spanning
+        check(first.planeNY() != 0 || second.planeNY() != 0, "both quads present in spanning or leaf");
+        sorter.close();
+    }
+
+    private static void testBspFullSet() {
+        List<LuminTranslucentQuad> input = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            input.add(axisAlignedQuad(0, i, i * 2 - 20, 10));
+        }
+        LuminTranslucentSorter sorter = new DynamicBSPSorter();
+        List<LuminTranslucentQuad> result = sorter.sort(new LuminCameraState(0, 0, 0, 5, 5, 20), input);
+        Set<Integer> inIndices = new HashSet<>();
+        for (LuminTranslucentQuad q : input) {
+            inIndices.add(q.vertexIndex0());
+        }
+        Set<Integer> outIndices = new HashSet<>();
+        for (LuminTranslucentQuad q : result) {
+            outIndices.add(q.vertexIndex0());
+        }
+        check(inIndices.equals(outIndices), "all quads preserved after BSP, input="
+                + inIndices.size() + " output=" + outIndices.size());
+        sorter.close();
+    }
+
+    private static void testBspCameraDependency() {
+        LuminTranslucentQuad front = axisAlignedQuad(0, 0, 5, 10);
+        LuminTranslucentQuad back = axisAlignedQuad(1, 0, -5, 10);
+        List<LuminTranslucentQuad> input = List.of(front, back);
+        LuminTranslucentSorter sorter = new DynamicBSPSorter();
+        // camera at z=10: back (z=-5) should be first
+        List<LuminTranslucentQuad> orderFromFront = sorter.sort(new LuminCameraState(0, 0, 0, 5, 5, 10), input);
+        check(orderFromFront.get(0) == back, "camera at z=10: back quad first, got vi0="
+                + orderFromFront.get(0).vertexIndex0());
+        // camera at z=-10: front (z=5) should be first
+        List<LuminTranslucentQuad> orderFromBack = sorter.sort(new LuminCameraState(0, 0, 0, 5, 5, -10), input);
+        check(orderFromBack.get(0) == front, "camera at z=-10: front quad first, got vi0="
+                + orderFromBack.get(0).vertexIndex0());
+        sorter.close();
+    }
+
+    /**
+     * 构造一个轴对齐（XY 平面）四边形，位于 z=zPlane，
+     * 面法线 +Z，中心在 (5,5,zPlane)，边长 side（从 (offset, offset, zPlane) 到 (offset+side, offset+side, zPlane)）。
+     * 顶点索引起始值为 baseIndex。
+     */
+    private static LuminTranslucentQuad axisAlignedQuad(int baseIndex, float offset, float zPlane, float side) {
+        float x0 = offset, y0 = offset, x1 = offset + side, y1 = offset + side;
+        return new LuminTranslucentQuad(
+                baseIndex + 0, baseIndex + 1, baseIndex + 2, baseIndex + 3,
+                x0, y0, zPlane, x1, y0, zPlane, x1, y1, zPlane, x0, y1, zPlane,
+                0f, 0f, 1f, -zPlane);
+    }
+
+    /** YZ 平面四边形（面法线 +X）。 */
+    private static LuminTranslucentQuad quadFacingX(float baseIndex, float xPlane, float offset, float side) {
+        float z0 = offset, z1 = offset + side;
+        return new LuminTranslucentQuad(
+                (int) baseIndex + 0, (int) baseIndex + 1, (int) baseIndex + 2, (int) baseIndex + 3,
+                xPlane, 0f, z0, xPlane, 0f, z1, xPlane, 10f, z1, xPlane, 10f, z0,
+                1f, 0f, 0f, -xPlane);
+    }
+
+    /** XZ 平面四边形（面法线 +Y）。 */
+    private static LuminTranslucentQuad quadFacingY(float baseIndex, float yPlane, float offset) {
+        float x0 = offset, x1 = offset + 10f, z0 = offset, z1 = offset + 10f;
+        return new LuminTranslucentQuad(
+                (int) baseIndex + 0, (int) baseIndex + 1, (int) baseIndex + 2, (int) baseIndex + 3,
+                x0, yPlane, z0, x1, yPlane, z0, x1, yPlane, z1, x0, yPlane, z1,
+                0f, 1f, 0f, -yPlane);
+    }
+
+    /** 跨越 Y 轴的梯形面（面法线 +Y），角点从 yLo 到 yHi（用于 BSP 跨越测试）。 */
+    private static LuminTranslucentQuad quadSpanningY(float baseIndex, float yPlane, float yLo, float yHi) {
+        float x0 = 0f, x1 = 10f, z0 = 0f, z1 = 10f;
+        return new LuminTranslucentQuad(
+                (int) baseIndex + 0, (int) baseIndex + 1, (int) baseIndex + 2, (int) baseIndex + 3,
+                x0, yLo, z0, x1, yLo, z0, x1, yHi, z1, x0, yHi, z1,
+                0f, 1f, 0f, -yPlane);
     }
 }

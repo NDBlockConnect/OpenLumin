@@ -2,7 +2,8 @@
 
 # WP-1 M3 Design: Batch Submission / Occlusion Culling / Translucent Sorting
 
-> 状态：设计草案 v0.1（2026-09-01）· 上游：M2 双基线 Store/Render 层（0472589, 1e3f3c5）·
+> 状态：M3a/M3b/M3c 全部实现（2026-09-01；批量提交 · 遮挡剔除 · 半透明排序，双基线/纯 CPU 分层验证）·
+> 上游：M2 双基线 Store/Render 层（0472589, 1e3f3c5）·
 > 参照：`_refers/sodium`（occlusion / translucent_sorting / async）· 零拷码纪律（D7）·
 > GitHub@NDBlockConnect | BlockConnect@StarsailsClover
 
@@ -100,7 +101,7 @@ public final class LuminOcclusionCuller {
   Store 槽位可回收（retire 决策留消费方）。
 - 验收：对全量渲染的 draw call 削减率与 Sodium 同场景对齐（±5%）——待游戏侧桥接后验证。
 
-### 3c. 半透明排序（Translucent Sorting，Sodium translucent_sorting 语义参照）
+### 3c. 半透明排序（Translucent Sorting，Sodium translucent_sorting 语义参照）✅ 已实现（M3c，2026-09-01）
 
 Sodium 模型提炼：
 - **数据三态**：NoData（无需排序）/ Static（拓扑序固定，法线轴对齐）/ Dynamic（需 BSP）；
@@ -110,21 +111,44 @@ Sodium 模型提炼：
 - **触发器**：Direct（法线直触发）+ GFNI（网格无关法线索引），相机移动触发重排序；
 - **产出**：`Sorter.writeIndexBuffer(cameraPos)` —— CPU 排序直接回写索引缓冲。
 
-OpenLumin API 草案：
+**实现交付**（lumin-chunk `sort/` 包，纯 CPU 全量单测）：
 
 ```java
 public enum LuminSortStrategy { NONE, STATIC_TOPO, DYNAMIC_BSP }
 public interface LuminTranslucentSorter extends AutoCloseable {
     LuminSortStrategy strategy();
-    // 排序产出写回调用方提供的索引缓冲（与 Store 槽位联动）
-    void writeIndexBuffer(LuminCameraPos cameraPos, ByteBuffer indexBufferOut);
+    List<LuminTranslucentQuad> sort(LuminCameraState camera, List<LuminTranslucentQuad> quads);
 }
 ```
 
+- `LuminTranslucentQuad`（4 顶点索引 + 4 角点坐标 + 面平面方程，消费方从 section 网格预计算）、
+  `LuminCameraState`（section 坐标 + section 内局部坐标，BSP 侧判定的输入）、
+  `NoneSorter`（原序直出）、`StaticTopoSorter`（构造期给定排列，每帧零开销）、
+  `DynamicBSPSorter`（二叉树分区 + 相机侧序遍历；分区面取离几何中心最近的四边形的面平面；
+  跨越/共面四边形挂在分区节点自身的 spanning 列表，**不剖切**——剖切方案列后续优化）。
+- **与草案的偏差**：产出为「排序后的列表」而非直接写 ByteBuffer——索引写入格式
+  （短/整、三角化与否）由消费方决定，库层不绑定索引编码；`LuminCameraPos` 更名
+  `LuminCameraState` 并显式区分 section 坐标与 section 内局部坐标。
 - **Store 联动**：重排序 = 索引槽位 `free` + `upload`（重传索引数据），顶点槽位不动——
   复用 M2 账本，无新 GPU 路径；
-- 触发阈值（相机位移/角度变化）与每帧预算衔接 M1 `getBusyFraction` 节流；
+- 触发阈值（相机位移/角度变化）与每帧预算衔接 M1 `getBusyFraction` 节流（消费方策略）；
 - M4+ 候选：26.2 Vulkan compute 半透明排序（GPU 侧），待 WP-3 render graph 落地后评估。
+
+**实现期发现并修复的两个真实缺陷（自测驱动，均会导致静默错序）**：
+1. **叶阈值过大 = 静默退回原序**：初版 `LEAF_THRESHOLD = 4`，而常见 section 的半透明
+   四边形数 ≤4，BSP 根本不建树 → 恒为输入序（既非前后序也无告警）。阈值降为 1，
+   小列表也走完整分区遍历。
+2. **共面分区四边形导致无限递归**：分区四边形自身与分区面共面，`classify` 把「全共面」
+   归入 BACK → 其递归子集仍含该四边形 → 反复选中同一分区面 → `StackOverflowError`。
+   修复：共面（无前无后）归入 SPANNING，保证分区四边形从递归子集移除，递归严格收缩。
+   该缺陷在小图（2 四边形）即复现，属 BSP 实现的经典陷阱。
+
+另做一处边界加固：剔除遍历的距离平方由 `int` 改 `long`（±2^20 section 坐标的
+距离平方可达 3×2^40，`int` 溢出会错误放行超距 section）。
+
+自测 7 节入 `LuminChunkM3SelfTest`（NoneSorter 保序、StaticTopo 排列、BSP 前后序、
+BSP 跨越四边形、BSP 全量保留、BSP 相机相关性、加 M3b/3a 回归），javac 5/5 +
+Gradle selfTest 全绿。
 
 ### 3d. NVIDIA 技术位（WP-4/WP-5 接口缝，M3 只留缝不实现）
 
@@ -140,12 +164,12 @@ M3 的职责是把区块渲染的帧内编排（批次序、pass 序）整理成
 
 ## 4. 分期与验收 / Milestones & Acceptance
 
-- **M3a 批量提交**：LuminSectionBatch + 双基线批量路径 + 回退链；
-  验收 = 单 pass draw call 数 ≤ region 数，CPU 提交时间 ≤ 逐 draw 的 50%。
-- **M3b 遮挡剔除**：LuminOcclusionCuller + 可见图抽象 + 异步遍历；
-  验收 = 测试图（合成可见图）单测 + 与全量渲染 draw call 削减对齐 Sodium ±5%。
-- **M3c 半透明排序**：三策略 + 触发器 + Store 槽位联动；
-  验收 = 合成场景（交叠半透明 quad）正确性用例（深度序逐帧比对参考实现）。
+- **M3a 批量提交** ✅ 已实现（2026-09-01，双基线 javac + loom 四绿）；
+  验收 = 单 pass draw call 数 ≤ region 数，CPU 提交时间 ≤ 逐 draw 的 50%（待游戏侧桥接验证）。
+- **M3b 遮挡剔除** ✅ 已实现（2026-09-01，纯 CPU 9 节单测）；
+  验收 = 合成可见图单测通过，与全量渲染 draw call 削减对齐 Sodium ±5%（待游戏侧桥接验证）。
+- **M3c 半透明排序** ✅ 已实现（2026-09-01，纯 CPU 7 节单测；含 2 个真实缺陷修复）；
+  验收 = 合成场景（交叠半透明 quad）正确性用例（深度序逐帧比对参考实现）待游戏侧验证。
 - **总验收**（性能超集）：Despotes WS 流水 A/B 截图 + 指标（同场景 vs Sodium：
   帧率 ≥100%、draw call ≤、CPU 帧时间分布）；行为级结论以运行用例为准（D7）。
 
