@@ -177,10 +177,48 @@ M3 的职责是把区块渲染的帧内编排（批次序、pass 序）整理成
 
 - Sodium 参照仅学习语义（三级可见性、位编码、BSP 节点族、触发器、Sorter 回写模型），
   **零代码移植**；许可确认前不拷任何文件（含测试数据）。
+  **⚠️ 许可更正（2026-09-12 前调）**：Sodium 为 **PolyForm Shield 1.0.0（含非竞争条款）**，
+  非 GPL/LGPL；原理复现可行，但禁止代码移植，且避免"Sodium 替代品"商业定位表述。
 - multiDrawIndexed IntBuffer 槽位语义、drawMultipleIndexed 的 uniform 上传时序：
   **实现期逐版本 javap 压实**（铁律 3/4）。
 - 既有 🟡 资产并入前审计：Render2DScheduler 合批（相机相对数学）、LuminRingBuffer
   （持久映射语义）——M3a 批次构建触碰前逐文件审计（WP-6 制度）。
+
+---
+
+## 6. M4 构建调度增强（前调驱动的原理级提升，2026-09-12）
+
+> 依据 `docs/audit/P0_superset_principles.md` §7.1：M1 执行器原先只有"忙碌度反馈"，
+> **缺"每帧提交预算"**——这正是 Sodium 调度模型的核心。M4a 补齐。
+
+**交付**（`lumin-chunk` 新增 `schedule/` 包，纯 CPU）：
+- `LuminJobEffort`：`(effort, durationNanos)` 训练样本。
+- `LuminDurationEstimator`：**在线指数衰减线性回归**（`duration ≈ slope×effort + intercept`），
+  新样本权重上限 5%，工作量方差不足时只更新截距，负斜率钳平为 0；
+  样本不足时退化为保守常量（5 ms）。**并发安全**（样本来自多 Worker，读取来自调度线程）。
+- `LuminFrameBudget`：平均帧时长 **增量式 EMA**（每步 ≥1 ns，保证恒定输入精确收敛，
+  避免朴素浮点 EMA 在目标附近停滞）+ 队列估计账目（**原子量**）+ 忙碌度 + 剩余容量 +
+  上传时长预算（30% 帧时长，下限 10 ms）。
+- `LuminSubmissionBudget`：**逐任务扣减**的双重约束（时长 + 上传时长/字节），
+  拒绝时不扣减；本帧阻塞档忽略上传约束。
+- `LuminDeferMode`：`ZERO_FRAMES / ONE_FRAME / ALWAYS_FRAME` 三档，含上传预算豁免策略。
+- `LuminChunkBuilder` 集成：`scheduleTask(..., effortHint)` 提交时预算、执行后回灌实测；
+  暴露 `frameBudget()` / `estimateDurationNanos()` / 估计器斜率截距；`LuminChunkJob` 增
+  `effortHint()` / `estimatedDurationNanos()`。
+
+**实现期发现并修复的两个真实缺陷**：
+1. **预算账目并发丢失更新**：`onQueued`（调度线程）与 `onCompleted`（Worker 线程）并发
+   修改普通 `long` → 计数漂移、永不归零（测试间歇性超时暴露）。改为 `AtomicLong` +
+   CAS 钳零；估计器同步化。**教训：把"每帧账目"接进多线程执行器时，账目本身的并发性
+   必须先设计**。
+2. **浮点 EMA 收敛停滞**：`round(0.95·v + 0.05·target)` 在目标附近停在 target−20 ns
+   永不精确到达（0.95 的浮点表示导致）。改为增量式（步长 `round(0.05·delta)`，至少 1 ns）。
+
+自测 8 节入 `LuminChunkM4SelfTest`（估计器回退/收敛/负斜率钳平、帧预算数学、EMA 收敛与钳制、
+提交预算双约束、延迟档策略、构建器集成），javac 8/8 + Gradle selfTest（M1..M4 聚合）全绿。
+
+**后续（M4b/M4c，原理见前调 §7）**：量化顶点格式定型（≤20 B/顶点）、arena 增量碎片整理与
+staging 环、多 draw 能力回退链（M5）、三级遮挡与 Morton 位树（M5）、半透明分类启发式（M6）。
 
 ---
 

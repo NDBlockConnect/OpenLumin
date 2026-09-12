@@ -28,6 +28,8 @@ public final class LuminChunkBuilder implements AutoCloseable {
 
     private static final long IDLE_PARK_NANOS = 250_000L;
     private static final long TERMINATION_TIMEOUT_SECONDS = 30L;
+    /** 无历史样本时的保守单任务耗时估计（5 ms，原理参照：新任务常量回退）。 */
+    static final long DEFAULT_INITIAL_JOB_DURATION_NANOS = 5_000_000L;
 
     private static final LuminBuildContext BUILD_CONTEXT = new LuminBuildContext();
 
@@ -38,12 +40,16 @@ public final class LuminChunkBuilder implements AutoCloseable {
     private final AtomicInteger pendingTasks = new AtomicInteger(0);
     private final BusyTracker busyTracker = new BusyTracker();
     private final AtomicBoolean terminated = new AtomicBoolean(false);
+    private final io.github.openlumin.chunk.schedule.LuminFrameBudget frameBudget;
+    private final io.github.openlumin.chunk.schedule.LuminDurationEstimator durationEstimator =
+            new io.github.openlumin.chunk.schedule.LuminDurationEstimator(DEFAULT_INITIAL_JOB_DURATION_NANOS);
     private volatile boolean shutdown = false;
 
     public LuminChunkBuilder(int threads) {
         if (threads < 1) {
             throw new IllegalArgumentException("threads must be >= 1, got " + threads);
         }
+        this.frameBudget = new io.github.openlumin.chunk.schedule.LuminFrameBudget(threads);
         this.workers = new Worker[threads];
         this.termination = new CountDownLatch(threads);
         for (int i = 0; i < threads; i++) {
@@ -58,14 +64,28 @@ public final class LuminChunkBuilder implements AutoCloseable {
 
     public <O extends LuminBuildOutput> LuminChunkJob<O> scheduleTask(
             LuminChunkTask<O> task, boolean important, Consumer<LuminChunkJobResult<O>> consumer) {
+        return scheduleTask(task, important, consumer, LuminChunkJob.EFFORT_UNKNOWN);
+    }
+
+    /**
+     * 带工作量提示的提交（原理参照：提交时预算成本，执行后回灌实测）。
+     *
+     * @param effortHint 任务工作量提示（如网格估计字节数）；{@link LuminChunkJob#EFFORT_UNKNOWN} 表示未知
+     */
+    public <O extends LuminBuildOutput> LuminChunkJob<O> scheduleTask(
+            LuminChunkTask<O> task, boolean important, Consumer<LuminChunkJobResult<O>> consumer,
+            long effortHint) {
         if (task == null) {
             throw new NullPointerException("task");
         }
         if (shutdown) {
             throw new IllegalStateException("builder is shut down");
         }
-        Job<O> job = new Job<>(task, consumer);
+        long effort = effortHint == LuminChunkJob.EFFORT_UNKNOWN ? 0L : Math.max(0L, effortHint);
+        long estimatedDuration = durationEstimator.estimateDurationNanos(effort);
+        Job<O> job = new Job<>(task, consumer, effort, estimatedDuration);
         pendingTasks.incrementAndGet();
+        frameBudget.onQueued(estimatedDuration, 0L);
         if (important) {
             importantQueue.addLast(job);
         } else {
@@ -76,6 +96,31 @@ public final class LuminChunkBuilder implements AutoCloseable {
 
     public boolean isQueueEmpty() {
         return pendingTasks.get() == 0;
+    }
+
+    /**
+     * 帧预算器（原理参照：以线程池一帧容量约束每帧提交量）。
+     * 调度方每帧先 {@code recordFrameDuration}，再以
+     * {@code remainingDurationNanos()} 构造 {@link io.github.openlumin.chunk.schedule.LuminSubmissionBudget}
+     * 限制本帧提交数量。
+     */
+    public io.github.openlumin.chunk.schedule.LuminFrameBudget frameBudget() {
+        return frameBudget;
+    }
+
+    /** 估计给定工作量的单任务耗时（纳秒）。 */
+    public long estimateDurationNanos(long effort) {
+        return durationEstimator.estimateDurationNanos(effort);
+    }
+
+    /** 估计器当前斜率（纳秒/工作量单位）；样本不足前为 0。 */
+    public double durationEstimatorSlope() {
+        return durationEstimator.slope();
+    }
+
+    /** 估计器当前截距（纳秒）。 */
+    public double durationEstimatorIntercept() {
+        return durationEstimator.intercept();
     }
 
     /**
@@ -139,6 +184,7 @@ public final class LuminChunkBuilder implements AutoCloseable {
     private void execute(Job<?> job) {
         LuminChunkJobResult<?> result;
         long start = System.nanoTime();
+        long elapsed;
         try {
             if (job.isCancelled()) {
                 result = LuminChunkJobResult.cancelled();
@@ -146,7 +192,12 @@ public final class LuminChunkBuilder implements AutoCloseable {
                 result = runTask(job);
             }
         } finally {
+            elapsed = System.nanoTime() - start;
             busyTracker.record(start, System.nanoTime());
+            frameBudget.onCompleted(job.estimatedDurationNanos(), 0L);
+            if (!job.isCancelled()) {
+                durationEstimator.record(job.effortHint(), elapsed);
+            }
         }
         Job raw = job;
         raw.finish(result);
@@ -219,11 +270,26 @@ public final class LuminChunkBuilder implements AutoCloseable {
         private final Consumer<LuminChunkJobResult<O>> consumer;
         private final CancellationToken.Token token = new CancellationToken.Token();
         private final CountDownLatch done = new CountDownLatch(1);
+        private final long effortHint;
+        private final long estimatedDurationNanos;
         private volatile LuminChunkJobResult<O> result;
 
-        Job(LuminChunkTask<O> task, Consumer<LuminChunkJobResult<O>> consumer) {
+        Job(LuminChunkTask<O> task, Consumer<LuminChunkJobResult<O>> consumer,
+            long effortHint, long estimatedDurationNanos) {
             this.task = task;
             this.consumer = consumer;
+            this.effortHint = effortHint;
+            this.estimatedDurationNanos = estimatedDurationNanos;
+        }
+
+        @Override
+        public long effortHint() {
+            return effortHint;
+        }
+
+        @Override
+        public long estimatedDurationNanos() {
+            return estimatedDurationNanos;
         }
 
         @Override

@@ -37,6 +37,11 @@ public final class LuminChunkM3SelfTest {
     }
 
     public static void main(String[] args) {
+        System.exit(runAll() == 0 ? 0 : 1);
+    }
+
+    /** 运行 M3 全部测试节（先聚合 M2+M1 回归），返回失败节数（可被 M4 聚合运行器复用）。 */
+    public static int runAll() {
         failures = LuminChunkM2SelfTest.runAll();
         section("visibility encoding", LuminChunkM3SelfTest::testEncoding);
         section("section pos packing", LuminChunkM3SelfTest::testPacking);
@@ -53,11 +58,7 @@ public final class LuminChunkM3SelfTest {
         section("BSP spanning quad", LuminChunkM3SelfTest::testBspSpanning);
         section("BSP full set retention", LuminChunkM3SelfTest::testBspFullSet);
         section("BSP camera dependency", LuminChunkM3SelfTest::testBspCameraDependency);
-        if (failures > 0) {
-            System.err.println("[lumin-chunk M3] " + failures + " section(s) FAILED");
-            System.exit(1);
-        }
-        System.out.println("[lumin-chunk M3] ALL SELF TESTS PASSED (M1 + M2 + M3)");
+        return failures;
     }
 
     private static void section(String name, Section body) {
