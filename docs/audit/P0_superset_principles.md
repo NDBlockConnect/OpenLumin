@@ -12,7 +12,7 @@
 
 | 参照 | 许可 | 对 OpenLumin 的约束 |
 |---|---|---|
-| **Sodium** | **PolyForm Shield 1.0.0**（非 GPL！含**非竞争条款**） | 仅原理级可学；**禁止**代码移植（含近似转录）。且若 OpenLumin 被定位为"Sodium 替代品"商业分发，会触碰非竞争条款 → 市场定位需避让 |
+| **Sodium** | **PolyForm Shield 1.0.0**（非 GPL！含**非竞争条款**） | 仅原理级可学；**禁止**代码移植（含近似转录）。**定位决策（2026-09-12）**：OpenLumin 为开源项目、无商业竞争场景，**不设"Sodium 替代品"自我限制**；保留"零代码移植"合规要求 |
 | **Iris** | **LGPL-3.0** | 原理级可学；链接 LGPL 需遵守重链接与源码可得条款 → 自研实现，不静态合入 |
 | **Embeddium** | LGPL-3.0（Sodium 系派生） | 同上 |
 | **SuperResolution** | **GPL-3.0**（本体）+ **LGPL-3.0**（native，README 误称 MIT）+ 捆绑 NVIDIA NGX/AMD FidelityFX/Intel XeSS/Qualcomm SGSR SDK 条款 | **最高红线**：D2 决议已定"绝不引入 superresolution 代码"。仅可学输入契约与集成结构；SGSR 着色器为 BSD-3、FSR 着色器为 MIT（单文件另有许可），但**其集成代码是 GPL，一律不引** |

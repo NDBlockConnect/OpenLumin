@@ -276,6 +276,41 @@ javac 5/5 + Gradle selfTest（M1..M4c 聚合）全绿。
 三级遮挡（Morton 位树 + 树复用 + 射线本地档 + 斜率掩码）、以及与 26.x 基线 GPU 层的接线
 （把 M4a 调度、M4b 顶点格式、M4c arena/staging 真正用到区块渲染路径）。
 
+## 9. M5a 三级遮挡加速结构（前调驱动的原理级提升，2026-09-12）
+
+> 依据前调 §1.4/§7.2：M3b 的剔除是"每帧全量 BFS"，缺三处关键加速——
+> **Morton 位树**（紧凑占用 + O(1) 子树判空）、**树复用**（相机微动免重建）、
+> **三级 tier 与近到远遍历**（宽/常规/本地 + inside 快速跳过）。M5a 补齐（纯 CPU）。
+
+**交付**（lumin-chunk `cull/` 包新增四类 + 扩展）：
+- `LuminMortonTree`：**真正的层级摘要位树**——叶子位图 2^18 位（64³ section 邻域），
+  每级节点位 = 其 8 个子节点位的 OR（共 7 级）；`hasAnyInSubtree(x,y,z,size)` 以
+  层级位 O(1) 判空；`interleave/deinterleave`（6 位/轴交错）、相对坐标编码与范围判定。
+- `LuminCullTier`：WIDE（bfsWidth=1、不做视锥测试）/ REGULAR（宽度 0 + 视锥）/
+  LOCAL（另加射线测试）；`NARROW_TO_WIDE` 支撑"取最窄有效档"。
+- `LuminTraversableTree`：Morton 树的可遍历视图——**近到远 8 叉遍历**（按相机象限
+  汉明距离排序子节点）+ **inside 标志**（`INSIDE_FRUSTUM`/`INSIDE_DISTANCE`，完全在内
+  的子树跳过逐叶判定）+ **树复用判定** `isValidFor(camera, distance)`（每轴位移 ≤ bfsWidth
+  且构建距离 ≥ 当前搜索距离）+ 叶级 includes/视锥/距离剪枝 + 空子树剪枝。
+- `LuminVisibilityRayTester`：LOCAL 档射线测试——分段步进（`MAX_RAY_STEPS=12`）要求
+  路径上存在"门户 section"（已判定可见者）；近距（< `48` 方块）直接放行。
+
+**实现期发现并修复的三个真实缺陷**：
+1. **遍历器把内部节点当叶访问**：`visitor` 在每层子节点循环中被调用 → 访问数远超实际
+   section 数（40 个 section 报 483 次 visit）。修：`visitor` 仅在 `size == 1` 的叶分支调用。
+2. **子树判空误用"Morton 码连续区间"**：立方体覆盖的 Morton 码**并不连续**，
+   按区间扫描会把大量空叶当作有内容 → 访问爆炸。修：改为**层级摘要位树**
+   （每级 = 子节点 OR），子树判空退化为一次位测试。
+3. **叶级剪枝被绕过**：父节点循环对 `childSize == 1` 直接 `visit`，跳过距离/视锥判定
+   （测试以"(0,0,0) 应被距离测试剪掉却仍被访问"暴露）。修：统一递归进 `traverseNode`，
+   由叶分支承担全部判定。
+
+自测 8 节入 `LuminChunkM5aSelfTest`（交错往返/树成员与摘要/子序近到远/树复用/
+遍历完备性/inside 标志/距离剪枝/射线测试），javac 5/5 + Gradle selfTest（M1..M5a 聚合）全绿。
+
+**下一步（M5b/M5c）**：多 draw 能力回退链（`multi_draw` / `indirect` / 逐 draw 探测与选择）、
+斜率角度掩码（提升 REGULAR 档精度）、以及 26.x 基线 GPU 接线（把 M4/M5 结构接入区块渲染路径）。
+
 ---
 
 *GitHub@NDBlockConnect | BlockConnect@StarsailsClover*
