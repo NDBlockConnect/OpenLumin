@@ -311,6 +311,47 @@ javac 5/5 + Gradle selfTest（M1..M4c 聚合）全绿。
 **下一步（M5b/M5c）**：多 draw 能力回退链（`multi_draw` / `indirect` / 逐 draw 探测与选择）、
 斜率角度掩码（提升 REGULAR 档精度）、以及 26.x 基线 GPU 接线（把 M4/M5 结构接入区块渲染路径）。
 
+## 10. M5b 多 draw 能力回退链（前调驱动的原理级提升，2026-09-12）
+
+> 依据前调 §1.3/§7.6 与 M3a 留下的开放项：Sodium 按设备能力在
+> `multi_draw` / `indirect` / 逐 draw 之间选择；M3a 只落了聚合通路（`drawMultipleIndexed`），
+> 未做能力探测与更强路径。M5b 补齐**能力 → 路径**的决策链与基线接线。
+
+**能力面实证（逐版本核对，铁律）**：
+- **26.2 有公开能力 API**：`GpuDevice.getDeviceInfo()` → `DeviceInfo.features()`（记录
+  `DeviceFeatures`），字段与批量 API 面一一对应：`multiDrawDirectInterleaved`（单 IntBuffer
+  交错形态，GL 不支持）、`multiDrawDirectSeparate`（三缓冲分离形态，GL 可）、
+  `multiDrawIndirect` / `drawIndirect`（间接）、`persistentMapping`（staging 前提）。
+- **26.1.2 无 `DeviceFeatures`/`DeviceInfo`**（仅 `GpuDevice`）→ 只能用保守基线或消费方注入。
+- 26.2 `RenderPass.multiDrawIndexed` 两个重载签名实证：
+  `(IntBuffer,int,int,int)` 交错；`(PointerBuffer indices, IntBuffer counts, IntBuffer baseVertices,
+  int instanceCount)` 分离——**索引起始以字节偏移指针数组传入**（= firstIndex × 索引宽度）。
+
+**交付**（lumin-chunk `batch/` 包，纯 CPU）：`LuminBatchCapabilities`（记录 6 项能力 +
+`baseline()`/`full()`）、`LuminBatchPath`（5 档，ordinal 即优先级）、`LuminBatchTraits`
+（批次特征：draw 数/共享 IBO/共享类型/**共享 VBO**/统一实例数/per-draw uniform/indirect 就绪）、
+`LuminBatchPlanner`（决策序：单 draw→逐 draw；indirect 就绪且支持→间接；共享 IBO+类型+VBO
+且统一实例数且无 per-draw uniform→交错/分离；否则聚合；兜底逐 draw）+ `describe()` 排障文本。
+
+**基线接线**：
+- fabric-26.2：新增 `LuminBatchCapabilityProbe.detect()`（真实读取 `DeviceFeatures`）；
+  `LuminSectionRenderer.drawSectionsBatched(pass, batch, capabilities, useIndirect)` 按规划器分派，
+  实现**分离缓冲多 draw 路径**（PointerBuffer 索引字节偏移 + counts + baseVertices + 统一实例数，
+  要求共享 VBO/IBO/类型，否则抛错——特征已在规划阶段排除）。
+- fabric-26.1.2：同签名入口但用保守基线（无 `DeviceFeatures`），实际仍走聚合通路。
+
+**实现期发现并修复的缺陷**：分离形态的**第 4 个参数不是数组**——26.2 是统一 `instanceCount`；
+且索引起始须经 `firstIndex × IndexType.bytes` 折算为**字节偏移指针数组**（初次实现误把
+firstIndex 单独放一个 IntBuffer 并传 5 参，javac 直接以签名不符报错，符合"以字节码为准"的经验）。
+
+**验证**：`LuminChunkM5bSelfTest` 7 节（单 draw/基线链/全能力偏好/混杂特征排除/间接就绪门槛/
+无能力兜底/不变量与单调性）+ M1..M5a 回归，javac ×3 与 Gradle selfTest 全绿；两条基线
+（26.2 seed 真实能力探测、26.1.2 保守基线）经 javac（真实 MC classpath）与 **Loom compileJava
+（26.2 3m50s、26.1.2 1m16s）双通过**。
+
+**下一步（M5c）**：把 M4/M5 结构真正接入区块渲染路径（调度器驱动构建、量化顶点写入、
+arena/staging 上传、位树剔除产出的可见集驱动批次生成），并准备游戏内验证。
+
 ---
 
 *GitHub@NDBlockConnect | BlockConnect@StarsailsClover*

@@ -3,6 +3,10 @@ package io.github.openlumin.chunk;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import io.github.openlumin.chunk.batch.LuminBatchCapabilities;
+import io.github.openlumin.chunk.batch.LuminBatchPath;
+import io.github.openlumin.chunk.batch.LuminBatchPlanner;
+import io.github.openlumin.chunk.batch.LuminBatchTraits;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,6 +65,35 @@ public final class LuminSectionRenderer {
         }
         pass.drawMultipleIndexed(vanillaDraws, batch.sharedIndexBuffer(),
                 batch.sharedIndexType(), null, null);
+    }
+
+    /**
+     * 能力驱动的批量绘制（M5b）：26.1.2 无 {@code DeviceFeatures} 能力 API
+     * （逐版本核对结论），故默认走保守基线（聚合通路），仅当消费方显式注入更强能力时
+     * 才可能选到其它路径。
+     *
+     * <p>26.1.2 的 vanilla 不提供 {@code multiDrawIndexed}（仅有 {@code drawMultipleIndexed}），
+     * 因此即便注入能力也不会选到直接形态——规划器按注入能力与实际批次特征决策。</p>
+     */
+    public void drawSectionsBatched(RenderPass pass, LuminSectionBatch batch,
+                                    LuminBatchCapabilities capabilities) {
+        List<LuminSectionDraw> draws = batch.draws();
+        GpuBuffer sharedIndexBuffer = batch.sharedIndexBuffer();
+        VertexFormat.IndexType sharedIndexType = batch.sharedIndexType();
+        LuminBatchTraits traits = new LuminBatchTraits(
+                draws.size(),
+                sharedIndexBuffer != null,
+                sharedIndexType != null,
+                true,
+                true,
+                false,
+                false);
+        LuminBatchPath path = LuminBatchPlanner.plan(capabilities, traits);
+        switch (path) {
+            case DRAW_MULTIPLE_INDEXED, MULTI_DRAW_INDIRECT, MULTI_DRAW_INTERLEAVED, MULTI_DRAW_SEPARATE ->
+                    drawSectionsBatched(pass, batch);
+            case PER_DRAW -> drawSections(pass, draws);
+        }
     }
 
     private static void setIndexBuffer(RenderPass pass, GpuBuffer indexBuffer, VertexFormat.IndexType indexType) {

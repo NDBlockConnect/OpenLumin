@@ -3,9 +3,9 @@
 
 tasks.register<JavaExec>("selfTest") {
     group = "verification"
-    description = "Runs lumin-chunk M1..M5a pure-CPU self tests (aggregated, no JUnit dependency)."
+    description = "Runs lumin-chunk M1..M5b pure-CPU self tests (aggregated, no JUnit dependency)."
     classpath = sourceSets["test"].runtimeClasspath
-    mainClass = "io.github.openlumin.chunk.LuminChunkM5aSelfTest"
+    mainClass = "io.github.openlumin.chunk.LuminChunkM5bSelfTest"
     maxHeapSize = "256m"
     jvmArgs("-XX:+UseSerialGC")
 }
