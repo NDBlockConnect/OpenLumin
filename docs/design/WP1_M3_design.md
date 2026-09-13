@@ -244,6 +244,38 @@ javac 5/5 + Gradle selfTest（M1..M4b 聚合）全绿。
 
 **后续（M4c，原理见前调 §7.4）**：arena 增量碎片整理与 staging 环。
 
+## 8. M4c 共享 Arena 与 Staging 环（前调驱动的原理级提升，2026-09-12）
+
+> 依据前调 §1.3/§7.4：Sodium 以"跨 region 共享大缓冲 + best-fit 子分配 + 增量碎片整理 +
+> 持久映射 staging 环（fence 回收）"摊平上传成本；M2 的 region 账本原先只做单 region
+> first-fit 且容量不足即抛。M4c 补 arena 与 staging 的**账本层**（GPU 侧 fence/copy 由基线层接入）。
+
+**交付**（lumin-chunk `store/` 包新增两类）：
+- `LuminArenaAllocator`：**空闲块按尺寸索引**（TreeMap&lt;size, blocks&gt;）→ best-fit O(log n)；
+  分配拆分、释放与整理均**自动合并相邻空闲块**（`addFreeMerging`）；
+  **增量碎片整理** `defragment(maxCopies, maxBytes)`——按偏移升序把已用段向其**紧下方**
+  空闲块搬移（每段最多 {@code MAX_DEFRAG_STEPS}=5 步），返回 `Move(segment, newOffset)`
+  指令由持有方搬运数据（GPU 侧 = copyToBuffer），句柄 offset 原地更新；
+  空闲占比 < {@code MIN_FREE_FRACTION_PERMILLE}=30‰ 时跳过（避免无谓搬移）。
+- `LuminStagingRing`：持久映射 staging 环账本——写游标环形回绕，**跨尾分配自动拆两段**
+  （各返回独立区间）；按**提交序号**批量回收（`reclaim(completedSubmitId)`，
+  模拟 fence 信号时序）；`uploadByteLimit()`（容量 ×80%）为**帧预算建议值**
+  （不在 allocate 内强制，否则单笔大上传会被卡死）。
+
+**实现期发现并修复的两个真实缺陷**：
+1. **改用尺寸索引空闲表后丢失相邻合并**：碎片永不回收，大分配持续失败——需在
+   释放/整理路径统一走 `addFreeMerging`。
+2. **碎片整理"让出区间"起点算错**：搬移后新腾出的空闲区间起点应为
+   `newOffset + size`（段的新顶），误用 `oldOffset + size` 会与既有空闲块重叠/漏并，
+   导致腾出的空间无法合并成大块（测试以"整理后能否分配 824 字节"暴露）。
+
+自测 5 节入 `LuminChunkM4cSelfTest`（best-fit/释放复用/碎片整理/跨尾拆段/回收），
+javac 5/5 + Gradle selfTest（M1..M4c 聚合）全绿。
+
+**下一步（WP-1 M5）**：多 draw 能力回退链（VK multi_draw / indirect / GL base-vertex）、
+三级遮挡（Morton 位树 + 树复用 + 射线本地档 + 斜率掩码）、以及与 26.x 基线 GPU 层的接线
+（把 M4a 调度、M4b 顶点格式、M4c arena/staging 真正用到区块渲染路径）。
+
 ---
 
 *GitHub@NDBlockConnect | BlockConnect@StarsailsClover*
