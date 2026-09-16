@@ -352,6 +352,35 @@ firstIndex 单独放一个 IntBuffer 并传 5 参，javac 直接以签名不符�
 **下一步（M5c）**：把 M4/M5 结构真正接入区块渲染路径（调度器驱动构建、量化顶点写入、
 arena/staging 上传、位树剔除产出的可见集驱动批次生成），并准备游戏内验证。
 
+## 11. M5c 端到端 CPU 管线协调器（前调驱动的集成收口，2026-09-12）
+
+> WP-1 各层（M1 执行器 / M2 账本 / M3 剔除排序批量 / M4 调度·顶点·arena / M5 位树·能力链）
+> 此前是并列的库件；M5c 用一个**每帧协调器**把它们串成可驱动的流水（GPU 侧留边界）。
+
+**交付**（lumin-chunk `pipeline/` 包）：
+- `LuminChunkMesh`：构建产出数据包（量化顶点 ByteBuffer + 索引 ByteBuffer + 计数），
+  `allocate(vertexCount, indexCount, quadCount, intIndices)`；`close()` 幂等、关闭后访问抛
+  ISE（防上传后误用）；外部传入缓冲**强制小端**（量化布局为小端，防宿主默认大端）。
+- `LuminMeshAssembler`：quad 级装配节拍（写前记录 UV 质心启用渗色偏置）+ 索引写出
+  （16/32 位自适应 + 越界明确抛错）+ `finish()` 校验写入量与声明一致。
+- `LuminChunkPipeline`：每帧时序 `beginFrame(帧时长, 上传预算) → requestBuild(节, effort,
+  延迟档, 任务) → cull(...) → endFrame()`。requestBuild 受 `LuminSubmissionBudget` 约束
+  （ZERO_FRAMES 豁免）；构建完成在 Worker 回调（未知 section 自关产出防泄漏）；
+  `recordAllocation`/`evict` 维护槽位记账；`FrameStats` 汇总（提交/延后/在途/记账/忙碌度）。
+  **并发**：全部可变状态经单一 `stateLock`（渲染线程写、Worker 线程读写；M4a 教训的直接应用）。
+
+**实现期发现并修复的真实缺陷——冷启动预算饿死**：EMA 从 1ms 最小值起步、估计器常量
+回退 5ms → 首帧预算（1ms×线程数）< 单任务估计 → **首帧全部构建被静默延后**（测试
+"首帧必须接受小构建"暴露）。修复：**EMA 首次调用直接设定初值**（冷启动经典修法），
+此后增量式逼近。教训：预算系统的"第一帧"必须有明确语义，不能依赖未初始化的统计量。
+
+自测 6 节入 `LuminChunkM5cSelfTest`（装配往返/关闭语义/预算构建/预算延后/剔除集成/
+淘汰记账）+ M1..M5b 回归，javac 5/5 + Gradle selfTest 全绿 + publishToMavenLocal 刷新。
+
+**WP-1 至此完成 CPU 侧全链**（Build/Store/Cull/Sort/Batch/Pipeline 六层 + 双基线 GPU 层）。
+**剩余**：基线 GPU 层把 `LuminChunkPipeline` 接进真实区块渲染（消费 MeshConsumer 上传、
+可见集驱动批次）与游戏内验证（需重建 mdl 实例）。
+
 ---
 
 *GitHub@NDBlockConnect | BlockConnect@StarsailsClover*

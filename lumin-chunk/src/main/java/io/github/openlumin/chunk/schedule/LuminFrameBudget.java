@@ -32,6 +32,7 @@ public final class LuminFrameBudget {
     private final int threadCount;
 
     private volatile long averageFrameDurationNanos = MIN_FRAME_DURATION_NANOS;
+    private volatile boolean averageInitialized;
     private final java.util.concurrent.atomic.AtomicLong queuedEstimatedDurationNanos =
             new java.util.concurrent.atomic.AtomicLong();
     private final java.util.concurrent.atomic.AtomicLong queuedEstimatedUploadBytes =
@@ -52,9 +53,14 @@ public final class LuminFrameBudget {
         return averageFrameDurationNanos;
     }
 
-    /** 以实测帧时长更新移动平均（超范围值被钳制）。 */
+    /** 以实测帧时长更新移动平均（超范围值被钳制）。首次调用直接设定初值（冷启动修复）。 */
     public void recordFrameDuration(long frameDurationNanos) {
         long clamped = Math.max(MIN_FRAME_DURATION_NANOS, Math.min(MAX_FRAME_DURATION_NANOS, frameDurationNanos));
+        if (!averageInitialized) {
+            averageInitialized = true;
+            averageFrameDurationNanos = clamped;
+            return;
+        }
         // 增量式 EMA：步长至少 1ns，保证恒定输入下能精确收敛（朴素浮点 EMA 会在目标附近停滞）
         long delta = clamped - averageFrameDurationNanos;
         if (delta == 0) {
