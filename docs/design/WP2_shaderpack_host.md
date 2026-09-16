@@ -208,8 +208,12 @@ clear images → shadow compute → setup(compute) → begin → shadow → prep
 
 ## 10. 分期交付 / Milestones
 
-- **M1（纯 CPU，可全量单测）**：模块 `lumin-shaderpack/`——目录发现 + include 图（含环检测）+
-  属性/指令解析 + `ShaderpackIR`；单测用**合成 shaderpack 夹具**（文本夹具，自写，不取第三方包）；
+- **M1（纯 CPU，可全量单测）** ✅ **已实现（2026-09-17）**：模块 `lumin-shaderpack/`——
+  目录发现 + include 图（含环检测与缺失目标追踪）+ 属性/指令解析 + `ShaderpackIR`；
+  自测 10 节全部使用**合成夹具**（仓库不存第三方 pack），javac 与 Gradle selfTest 全绿。
+  实现期修复 4 个真实缺陷（include 图覆盖面、缺失 include 未报告、续行空白、属性去引号），
+  详见 `memory/FACT.md` 的「WP-2 M1 解析层落地」节；另确认**维度文件夹变体共享程序标识**
+  （按维度在编译期选择）这一语义细节。
 - **M2（纯 CPU）**：`PassGraph` 构建（依赖推导、hazard 分析、拓扑序）+ 与 Iris 默认时序的
   **等价性验证**（同包语义下拓扑序必须能复现 Iris 固定序）；
 - **M3（平台层）**：`ShaderpackIR`+`PassGraph` → `LuminRenderPipelines` 编译（26.1.2 GL 先行）；
