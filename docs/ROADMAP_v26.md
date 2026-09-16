@@ -49,6 +49,9 @@
   VertexFormat/GpuBuffer 能力是否满足 multi-draw（26.2 的 drawIndexedIndirect 已在 vanilla API 面）。
 - **WP-2 Shaderpack 宿主**：shaderpack 解析（Iris 语法为超集目标）→ 编译为 LuminRenderPipelines
   组合；shadow pass 与主 pass 的 render graph；Iris 兼容层 + OptiFine 语法兼容层分两期。
+  **设计草案已产出（2026-09-17）**：`docs/design/WP2_shaderpack_host.md`（六层架构：
+  发现→预处理→解析→PassGraph 规划→编译→执行；M1/M2 纯 CPU 可单测；资源模型与阴影 pass 规格；
+  与 WP-1 的顶点属性桥接决策；**运动向量/深度/抖动引擎侧产出**作为 WP-4/WP-5 前提）。
 - **WP-3 后处理链**：render graph（pass 调度、资源别名、自动屏障）——当前 post 链的严格审计后重写。
 - **WP-4 厂商层**：NvAPI（Nvidia：FG/Reflex/DLSS-D）与 AGS（AMD：FSR/AFMF）native 桥；
   组织规范：native 层独立 Gradle 模块 + MIT 许可（参照 superresolution 的组织方式，代码自研）。
