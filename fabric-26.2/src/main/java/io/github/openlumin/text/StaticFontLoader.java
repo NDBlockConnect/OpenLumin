@@ -17,16 +17,32 @@ public class StaticFontLoader {
     private static final String[] FONT_FILE_EXTENSIONS = {".ttf", ".otf", ".ttc"};
     private static final String SIZE_REFERENCE_SAMPLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789简体中文字体设置默认自定义战斗移动玩家渲染";
     private static final Identifier DEFAULT_FONT_ID = Identifier.fromNamespaceAndPath("openlumin", "fonts/font.ttf");
-    private static TtfFontLoader builtinDefault = new TtfFontLoader(DEFAULT_FONT_ID);
-    private static final float DEFAULT_VISUAL_HEIGHT = builtinDefault.fontFile.getVisualHeight(SIZE_REFERENCE_SAMPLE);
+    private static TtfFontLoader builtinDefault = safeBuiltin(DEFAULT_FONT_ID);
+    /** 0 表示未知（缺字体），调用方需自行兜底。 */
+    private static final float DEFAULT_VISUAL_HEIGHT =
+            builtinDefault != null ? builtinDefault.fontFile.getVisualHeight(SIZE_REFERENCE_SAMPLE) : 0f;
 
     public static volatile TtfFontLoader DEFAULT = builtinDefault;
 
-    public static final TtfFontLoader ICONS = new TtfFontLoader(Identifier.fromNamespaceAndPath("openlumin", "fonts/icons.ttf"));
+    /**
+     * Jura 字体的历史入口（资源见 assets/openlumin/fonts/jura-light.ttf，
+     * 实为包含 Light–Bold 全字重的可变字体；许可与来源见同目录 README.md 与 OFL.txt）。
+     */
+    public static final TtfFontLoader JURA_LIGHT = safeBuiltin(Identifier.fromNamespaceAndPath("openlumin", "fonts/jura-light.ttf"));
 
-    public static final TtfFontLoader JURA_LIGHT = new TtfFontLoader(Identifier.fromNamespaceAndPath("openlumin", "fonts/jura-light.ttf"));
-
-    public static final TtfFontLoader OSAKA_CHIPS = new TtfFontLoader(Identifier.fromNamespaceAndPath("openlumin", "fonts/osakachips.ttf"));
+    /**
+     * 缺失/损坏的字体资源绝不能让静态初始化失败（否则 NoClassDefFoundError 会蔓延到所有渲染路径，
+     * 甚至触发 JVM 原生崩溃）。降级为 null 并记录一次性错误日志。
+     */
+    private static TtfFontLoader safeBuiltin(Identifier fontId) {
+        try {
+            return new TtfFontLoader(fontId);
+        } catch (Throwable t) {
+            Constants.LOGGER.error("[OpenLumin] Font resource unavailable (text disabled for this face): {} — {}",
+                    fontId, t.toString());
+            return null;
+        }
+    }
 
     private static TtfFontLoader customDefault;
     private static Path customDefaultPath;

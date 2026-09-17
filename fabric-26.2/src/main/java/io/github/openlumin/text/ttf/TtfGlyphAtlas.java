@@ -32,7 +32,7 @@ public class TtfGlyphAtlas {
     private int currentRowHeight = 0;
 
     public TtfGlyphAtlas(int atlasId) {
-        this.textureId = Identifier.fromNamespaceAndPath("epsilon", "ttf_atlas/" + NEXT_TEXTURE_ID.getAndIncrement());
+        this.textureId = Identifier.fromNamespaceAndPath("openlumin", "ttf_atlas/" + NEXT_TEXTURE_ID.getAndIncrement());
 
         final var device = RenderSystem.getDevice();
 
@@ -55,13 +55,14 @@ public class TtfGlyphAtlas {
         ByteBuffer transparent = MemoryUtil.memAlloc(SIZE * SIZE);
         try {
             MemoryUtil.memSet(MemoryUtil.memAddress(transparent), 0xFF, SIZE * SIZE);
+            // MC 26.2 signature: writeToTexture(tex, buf, mipLevel, z/layer, x, y, width, height)
             RenderSystem.getDevice().createCommandEncoder().writeToTexture(
                     texture,
                     transparent,
-                    0, 0,
-                    SIZE, SIZE,
-                    0,
-                    SIZE
+                    0,      // mipLevel
+                    0,      // z / layer
+                    0, 0,   // x, y
+                    SIZE, SIZE
             );
         } finally {
             MemoryUtil.memFree(transparent);
@@ -94,10 +95,11 @@ public class TtfGlyphAtlas {
         RenderSystem.getDevice().createCommandEncoder().writeToTexture(
                 this.texture.getTexture(),
                 glyph.glyphData(),
-                glyphX, glyphY,
-                glyph.width(), glyph.height(),
-                0,
-                glyph.width()
+                0,                  // mipLevel
+                0,                  // z / layer
+                glyphX, glyphY,     // x, y
+                glyph.width(),      // width
+                glyph.height()      // height
         );
 
         GlyphUV uv = new GlyphUV(

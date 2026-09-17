@@ -1,7 +1,22 @@
+import org.gradle.api.initialization.resolve.RepositoriesMode
+
 pluginManagement {
     repositories {
         gradlePluginPortal()
         maven { url = 'https://maven.neoforged.net/releases' }
+    }
+}
+
+// 预先声明仓库（含 mavenLocal），避免 NeoGradle 在仓库已被解析后再注入 mavenLocal 而报
+// "Cannot mutate content repository descriptor ... after repository has been used"。
+// PREFER_SETTINGS: 以本处声明为准，项目级若再增改仓库将直接报错而非静默篡改。
+dependencyResolutionManagement {
+    repositoriesMode = RepositoriesMode.PREFER_SETTINGS
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        maven { url = 'https://maven.neoforged.net/releases' }
+        maven { url = 'https://libraries.minecraft.net/' }
     }
 }
 

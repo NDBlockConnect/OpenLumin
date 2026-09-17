@@ -33,53 +33,72 @@ public class TextRenderer implements IRenderer {
 
     public void addText(String text, float x, float y, float scale, Color color, TtfFontLoader fontLoader) {
         ensureRegistered();
-        textRenderer.addText(text, x, y, scale, color, fontLoader);
+        if (fontLoader != null) {
+            textRenderer.addText(text, x, y, scale, color, fontLoader);
+        }
     }
 
     public void addGradientText(String text, float x, float y, float scale, Color startColor, Color endColor, TtfFontLoader fontLoader) {
         ensureRegistered();
-        textRenderer.addGradientText(text, x, y, scale, startColor, endColor, fontLoader);
+        if (fontLoader != null) {
+            textRenderer.addGradientText(text, x, y, scale, startColor, endColor, fontLoader);
+        }
     }
 
     public void addRotatedText(String text, float x, float y, float scale, Color color, TtfFontLoader fontLoader, float originX, float originY, float rotationDegrees) {
         ensureRegistered();
-        textRenderer.addRotatedText(text, x, y, scale, color, fontLoader, originX, originY, rotationDegrees);
+        if (fontLoader != null) {
+            textRenderer.addRotatedText(text, x, y, scale, color, fontLoader, originX, originY, rotationDegrees);
+        }
     }
 
     public void addText(String text, float x, float y, float scale, Color color) {
+        if (fontUnavailable()) return;
         textRenderer.addText(text, x, y, scale, color, StaticFontLoader.defaultFont());
     }
 
     public void addRotatedText(String text, float x, float y, float scale, Color color, float originX, float originY, float rotationDegrees) {
+        if (fontUnavailable()) return;
         textRenderer.addRotatedText(text, x, y, scale, color, StaticFontLoader.defaultFont(), originX, originY, rotationDegrees);
     }
 
     public void addGradientText(String text, float x, float y, float scale, Color startColor, Color endColor) {
+        if (fontUnavailable()) return;
         textRenderer.addGradientText(text, x, y, scale, startColor, endColor, StaticFontLoader.defaultFont());
     }
 
     public void addText(String text, float x, float y, Color color, TtfFontLoader fontLoader) {
+        if (fontUnavailable() || fontLoader == null) return;
         textRenderer.addText(text, x, y, 1.0f, color, fontLoader);
     }
 
     public void addText(String text, float x, float y, Color color) {
+        if (fontUnavailable()) return;
         textRenderer.addText(text, x, y, 1.0f, color, StaticFontLoader.defaultFont());
     }
 
     public float getHeight(float scale) {
-        return textRenderer.getHeight(scale, StaticFontLoader.defaultFont());
+        return fontUnavailable() ? 0f : textRenderer.getHeight(scale, StaticFontLoader.defaultFont());
     }
 
     public float getHeight(float scale, TtfFontLoader fontLoader) {
-        return textRenderer.getHeight(scale, fontLoader);
+        return (fontUnavailable() || fontLoader == null) ? 0f : textRenderer.getHeight(scale, fontLoader);
     }
 
     public float getWidth(String text, float scale) {
-        return textRenderer.getWidth(text, scale, StaticFontLoader.defaultFont());
+        return fontUnavailable() ? 0f : textRenderer.getWidth(text, scale, StaticFontLoader.defaultFont());
     }
 
     public float getWidth(String text, float scale, TtfFontLoader fontLoader) {
-        return textRenderer.getWidth(text, scale, fontLoader);
+        return (fontUnavailable() || fontLoader == null) ? 0f : textRenderer.getWidth(text, scale, fontLoader);
+    }
+
+    /**
+     * 缺字体时整条文本路径静默降级为无操作：调用方不崩、不绘制、宽度按 0 计。
+     * 正常安装（字体资源在位）时永远为 false，零开销。
+     */
+    private static boolean fontUnavailable() {
+        return StaticFontLoader.defaultFont() == null;
     }
 
     public void setScissor(int x, int y, int width, int height) {

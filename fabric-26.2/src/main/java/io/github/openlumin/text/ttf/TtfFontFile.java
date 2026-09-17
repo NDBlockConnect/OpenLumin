@@ -24,9 +24,7 @@ public class TtfFontFile {
     public final int fontHeight;
 
     public TtfFontFile(Identifier ttfFile, int totalHeight, int padding) {
-        // NeoForge不支持ResourceLocationUtils.loadResource
-        // this(ResourceLocationUtils.loadResource(ttfFile), totalHeight, padding, ttfFile.toString());
-        this(ByteBuffer.allocate(0), totalHeight, padding, ttfFile.toString());
+        this(loadFontFile(ttfFile), totalHeight, padding, ttfFile.toString());
     }
 
     public TtfFontFile(Path ttfFile, int totalHeight, int padding) {
@@ -74,6 +72,19 @@ public class TtfFontFile {
             return buffer;
         } catch (IOException e) {
             throw new RuntimeException("Failed to read font file: " + path, e);
+        }
+    }
+
+    /**
+     * 通过客户端 ResourceManager 读取字体资源。资源缺失或为空时抛出明确异常，
+     * 绝不把空缓冲交给 stbtt_InitFont（曾导致 JVM 原生崩溃）。
+     */
+    private static ByteBuffer loadFontFile(Identifier location) {
+        try {
+            return io.github.openlumin.utils.ResourceLocationUtils.loadResource(location);
+        } catch (IOException e) {
+            throw new IllegalStateException("Missing or unreadable TTF font resource: " + location
+                    + " — bundle the font under assets/" + location.getNamespace() + "/", e);
         }
     }
 
