@@ -7,13 +7,12 @@ pluginManagement {
     }
 }
 
-// 预先声明仓库（含 mavenLocal），避免 NeoGradle 在仓库已被解析后再注入 mavenLocal 而报
-// "Cannot mutate content repository descriptor ... after repository has been used"。
-// PREFER_SETTINGS: 以本处声明为准，项目级若再增改仓库将直接报错而非静默篡改。
+// PREFER_PROJECT: 项目级仓库（含 NeoGradle 内部 Ivy 仓库，selectRawArtifact 产物所在）
+// 优先于本处声明。PREFER_SETTINGS 会把 NeoGradle 注入的 Ivy 仓库一并排除，
+// 导致 compileClasspath 找不到 ng_dummy_ng.net.neoforged:neoforge 内部产物。
 dependencyResolutionManagement {
-    repositoriesMode = RepositoriesMode.PREFER_SETTINGS
+    repositoriesMode = RepositoriesMode.PREFER_PROJECT
     repositories {
-        mavenLocal()
         mavenCentral()
         maven { url = 'https://maven.neoforged.net/releases' }
         maven { url = 'https://libraries.minecraft.net/' }
