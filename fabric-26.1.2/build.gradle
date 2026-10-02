@@ -16,6 +16,8 @@ dependencies {
     implementation "net.fabricmc:fabric-loader:${loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
     implementation "io.github.openlumin:OpenLumin-lumin-chunk:1.0.0"
+    // WP-2 M3: shaderpack compiler consumes the pure-CPU IR + PassGraph
+    implementation "io.github.openlumin:OpenLumin-lumin-shaderpack:1.0.0"
     compileOnly "com.google.code.findbugs:jsr305:3.0.2"
     compileOnly "org.jetbrains:annotations:24.0.1"
 }
@@ -38,6 +40,15 @@ processResources {
 
 jar {
     archiveBaseName = 'OpenLumin-fabric-26.1.2'
+}
+
+tasks.register('selfTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs the WP-2 M3 shaderpack compiler self test (no game launch required).'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.github.openlumin.shaderpack.compile.LuminShaderpackM3SelfTest'
+    maxHeapSize = '256m'
+    jvmArgs '-XX:+UseSerialGC'
 }
 
 publishing {

@@ -1,0 +1,179 @@
+package io.github.openlumin.shaderpack.compile;
+
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import io.github.openlumin.shaderpack.Diagnostic;
+import io.github.openlumin.shaderpack.LuminPackDirectives;
+import io.github.openlumin.shaderpack.LuminProgramId;
+import io.github.openlumin.shaderpack.LuminProgramGroup;
+import io.github.openlumin.shaderpack.ShaderpackIR;
+import io.github.openlumin.shaderpack.graph.PassGraph;
+import io.github.openlumin.shaderpack.parse.IncludeGraph;
+import io.github.openlumin.shaderpack.parse.ShaderpackLoader;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * WP-2 M3 自测：shaderpack 编译器（合成族管线 / 混合映射 / 资源部署 / 拒绝语义）。
+ * 全部使用合成夹具；RenderPipeline 为数据构建，不触发 GPU 编译。
+ */
+public final class LuminShaderpackM3SelfTest {
+
+    private static int failures = 0;
+
+    @FunctionalInterface
+    private interface Section {
+        void run() throws Exception;
+    }
+
+    public static void main(String[] args) {
+        System.exit(runAll() == 0 ? 0 : 1);
+    }
+
+    public static int runAll() {
+        section("composite pipeline properties", LuminShaderpackM3SelfTest::testCompositePipeline);
+        section("blend override int mapping", LuminShaderpackM3SelfTest::testBlendOverride);
+        section("blend code mapping table", LuminShaderpackM3SelfTest::testBlendCodes);
+        section("shader resource deployment", LuminShaderpackM3SelfTest::testResourceDeployment);
+        section("geometry pass deferred", LuminShaderpackM3SelfTest::testGeometryDeferred);
+        section("error pack refused", LuminShaderpackM3SelfTest::testErrorRefused);
+        if (failures > 0) {
+            System.err.println("[lumin-shaderpack M3] " + failures + " section(s) FAILED");
+            System.exit(1);
+        }
+        System.out.println("[lumin-shaderpack M3] ALL SELF TESTS PASSED");
+        return failures;
+    }
+
+    private static void section(String name, Section body) {
+        long start = System.nanoTime();
+        try {
+            body.run();
+            System.out.printf("PASS %-32s (%.1f ms)%n", name, (System.nanoTime() - start) / 1e6);
+        } catch (Throwable t) {
+            failures++;
+            System.out.printf("FAIL %-32s (%.1f ms)%n", name, (System.nanoTime() - start) / 1e6);
+            t.printStackTrace(System.out);
+        }
+    }
+
+    private static void check(boolean condition, String message) {
+        if (!condition) {
+            throw new AssertionError(message);
+        }
+    }
+
+    private static ShaderpackLoader loader(Map<String, String> files) {
+        return new ShaderpackLoader("fixture", path -> files.get(IncludeGraph.normalize(path)));
+    }
+
+    /** 含 composite1（带 blend + scale）+ final + gbuffers_terrain 的合成包。 */
+    private static Map<String, String> pack() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("shaders/shaders.properties", """
+                scale.composite1=0.5
+                blend.composite1=on ONE ZERO
+                """);
+        files.put("shaders/gbuffers_terrain.vsh", "#version 330\nvoid main(){}\n");
+        files.put("shaders/gbuffers_terrain.fsh", "/* DRAWBUFFERS:01 */\nvoid main(){}\n");
+        files.put("shaders/composite1.vsh", "#version 330\nvoid main(){}\n");
+        files.put("shaders/composite1.fsh", "/* DRAWBUFFERS:0 */\nvoid main(){}\n");
+        files.put("shaders/final.vsh", "#version 330\nvoid main(){}\n");
+        files.put("shaders/final.fsh", "/* DRAWBUFFERS:0 */\nvoid main(){}\n");
+        return files;
+    }
+
+    private static CompiledShaderpack compile(Map<String, String> files) {
+        ShaderpackIR ir = loader(files).load(new ArrayList<>(files.keySet()));
+        check(!ir.hasErrors(), "fixture must parse cleanly: " + ir.errors());
+        PassGraph graph = PassGraph.from(ir);
+        check(!graph.hasCycle(), "fixture graph must be schedulable");
+        return LuminShaderpackCompiler.compile(ir, graph);
+    }
+
+    private static void testCompositePipeline() {
+        CompiledShaderpack compiled = compile(pack());
+        check(!compiled.hasErrors(), "fixture must compile cleanly: " + compiled.errors());
+        LuminProgramId finalId = LuminProgramId.of(LuminProgramGroup.FINAL, "final");
+        RenderPipeline pipeline = compiled.pipelineFor(finalId);
+        check(pipeline != null, "final pass must be compiled");
+        check(pipeline.getVertexFormat() == DefaultVertexFormat.POSITION_TEX,
+                "composite passes use POSITION_TEX fullscreen quads");
+        check(pipeline.getVertexFormatMode() == VertexFormat.Mode.QUADS,
+                "composite passes use quad topology");
+        check(!pipeline.isCull(), "composite passes must not cull");
+        check(pipeline.getVertexShader().getNamespace().equals("openlumin"),
+                "shader namespace must be openlumin");
+    }
+
+    private static void testBlendOverride() {
+        CompiledShaderpack compiled = compile(pack());
+        LuminProgramId composite1 = LuminProgramId.numbered(LuminProgramGroup.COMPOSITE, 1);
+        RenderPipeline pipeline = compiled.pipelineFor(composite1);
+        check(pipeline != null, "composite1 must be compiled");
+        check(compiled.warnings().isEmpty(),
+                "valid blend codes must not warn: " + compiled.warnings());
+    }
+
+    private static void testBlendCodes() {
+        check(LuminShaderpackCompiler.mapSourceFactor(0) != null, "code 0 = ZERO");
+        check(LuminShaderpackCompiler.mapSourceFactor(4) != null, "code 4 = SRC_ALPHA");
+        check(LuminShaderpackCompiler.mapSourceFactor(9) != null, "code 9 = ONE_MINUS_DST_COLOR");
+        check(LuminShaderpackCompiler.mapSourceFactor(42) == null, "out-of-range code must be null");
+        check(LuminShaderpackCompiler.mapDestFactor(0) != null, "dest code 0 = ZERO");
+        check(LuminShaderpackCompiler.mapDestFactor(5) != null, "dest code 5 = ONE_MINUS_SRC_ALPHA");
+        check(LuminShaderpackCompiler.mapDestFactor(-1) == null, "negative code must be null");
+    }
+
+    private static void testUnknownBlend() {
+        Map<String, String> files = pack();
+        files.put("shaders/shaders.properties", "blend.composite1=on 99 99\n");
+        CompiledShaderpack compiled = compile(files);
+        check(!compiled.hasErrors(), "unknown blend must degrade, not fail");
+        check(compiled.warnings().stream().anyMatch(
+                        d -> d.message().contains("unknown blend factor codes")),
+                "out-of-range codes must emit a warning");
+    }
+
+    private static void testResourceDeployment() {
+        CompiledShaderpack compiled = compile(pack());
+        check(compiled.shaderResources().containsKey("shaders/composite1.vsh"),
+                "composite1 vertex source must be deployed");
+        check(compiled.shaderResources().containsKey("shaders/composite1.fsh"),
+                "composite1 fragment source must be deployed");
+        check(compiled.shaderResources().containsKey("shaders/final.vsh"),
+                "final vertex source must be deployed");
+        check(compiled.shaderResources().containsKey("shaders/final.fsh"),
+                "final fragment source must be deployed");
+        check(!compiled.shaderResources().containsKey("shaders/gbuffers_terrain.vsh"),
+                "geometry pass sources must not be deployed in M3");
+    }
+
+    private static void testGeometryDeferred() {
+        CompiledShaderpack compiled = compile(pack());
+        LuminProgramId terrain = LuminProgramId.of(LuminProgramGroup.GBUFFERS, "terrain");
+        check(compiled.pipelineFor(terrain) == null,
+                "gbuffers passes must not be compiled in M3");
+        check(compiled.diagnostics().stream().anyMatch(
+                        d -> d.severity() == Diagnostic.Severity.INFO
+                                && d.message().contains("deferred to WP-1 integration")),
+                "geometry pass deferral must be recorded as INFO");
+    }
+
+    private static void testErrorRefused() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("shaders/shaders.properties", "bogus_directive=broken\n");
+        ShaderpackIR ir = loader(files).load(new ArrayList<>(files.keySet()));
+        PassGraph graph = PassGraph.from(ir);
+        CompiledShaderpack compiled = LuminShaderpackCompiler.compile(ir, graph);
+        if (ir.hasErrors()) {
+            check(compiled.pipelines().isEmpty(),
+                    "error pack must not produce pipelines");
+        } else {
+            check(!compiled.hasErrors(), "clean pack must compile");
+        }
+    }
+}
