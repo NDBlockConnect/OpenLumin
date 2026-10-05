@@ -78,7 +78,8 @@ public final class LuminFrameUniformsSelfTest {
                                                   float rawSun, float rawMoon) {
         return new LuminFrameUniformInputs(rawSun, rawMoon, 0f, modelView,
                 6000, 3, 5, 0.016f, 100f, 0f, 0f,
-                1.0, 2.0, 3.0, 0f, 0f, 0f, 0f);
+                1.0, 2.0, 3.0, 0f, 0f, 0f, 0f,
+                1.25, 2.25, 3.25);
     }
 
     private static void testAngles() {
@@ -132,7 +133,8 @@ public final class LuminFrameUniformsSelfTest {
         Matrix4f identity = new Matrix4f();
         LuminFrameUniforms norm = LuminFrameUniforms.compute(new LuminFrameUniformInputs(
                 0f, 0f, 0f, identity, 6000, 3, 5, 0.016f, 100f,
-                0f, 0f, 0.0, 64.0, 0.0, 0f, 0f, 0f, 0f));
+                0f, 0f, 0.0, 64.0, 0.0, 0f, 0f, 0f, 0f,
+                0.0, 64.0, 0.0));
         check(norm.frameCounter() == 6, "frame counter increments");
         checkClose(norm.frameTimeCounter(), 100.016f, "frame time counter accumulates");
         checkClose(norm.frameTime(), 0.016f, "frame time passthrough");
@@ -140,12 +142,14 @@ public final class LuminFrameUniformsSelfTest {
         LuminFrameUniforms wrapped = LuminFrameUniforms.compute(new LuminFrameUniformInputs(
                 0f, 0f, 0f, identity, 0, 0,
                 LuminFrameUniforms.FRAME_COUNTER_WRAP - 1, 0.016f, 10f,
-                0f, 0f, 0.0, 0.0, 0.0, 0f, 0f, 0f, 0f));
+                0f, 0f, 0.0, 0.0, 0.0, 0f, 0f, 0f, 0f,
+                0.0, 0.0, 0.0));
         check(wrapped.frameCounter() == 0, "frame counter wraps at 720720");
 
         LuminFrameUniforms timeWrapped = LuminFrameUniforms.compute(new LuminFrameUniformInputs(
                 0f, 0f, 0f, identity, 0, 0, 0, 0.6f, 3599.5f,
-                0f, 0f, 0.0, 0.0, 0.0, 0f, 0f, 0f, 0f));
+                0f, 0f, 0.0, 0.0, 0.0, 0f, 0f, 0f, 0f,
+                0.0, 0.0, 0.0));
         checkClose(timeWrapped.frameTimeCounter(), 0f,
                 "frame time counter resets at 3600s");
     }
@@ -154,7 +158,8 @@ public final class LuminFrameUniformsSelfTest {
         Matrix4f identity = new Matrix4f();
         LuminFrameUniforms u = LuminFrameUniforms.compute(new LuminFrameUniformInputs(
                 0f, 0f, 0f, identity, 12345, 7, 0, 0.02f, 0f,
-                0.4f, 0.6f, 12.5, 64.25, -3.5, 1f, 0.5f, 0.25f, 0.1f));
+                0.4f, 0.6f, 12.5, 64.25, -3.5, 1f, 0.5f, 0.25f, 0.1f,
+                12.75, 64.5, -3.25));
         check(u.worldTime() == 12345 && u.worldDay() == 7, "world time passthrough");
         checkClose(u.rainStrength(), 0.4f, "rain passthrough");
         checkClose(u.wetness(), 0.6f, "wetness passthrough");
@@ -166,6 +171,9 @@ public final class LuminFrameUniformsSelfTest {
         checkClose(u.nightVision(), 0.5f, "night vision passthrough");
         checkClose(u.blindness(), 0.25f, "blindness passthrough");
         checkClose(u.darknessFactor(), 0.1f, "darkness passthrough");
+        check(u.playerEyePosition()[0] == 12.75 && u.playerEyePosition()[1] == 64.5
+                        && u.playerEyePosition()[2] == -3.25,
+                "player eye position passthrough (double, distinct from camera)");
     }
 
     private LuminFrameUniformsSelfTest() {

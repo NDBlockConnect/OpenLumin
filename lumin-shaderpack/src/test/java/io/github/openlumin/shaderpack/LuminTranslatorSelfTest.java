@@ -27,6 +27,7 @@ public final class LuminTranslatorSelfTest {
         section("translate: modern passthrough", LuminTranslatorSelfTest::testModernPassthrough);
         section("translate: unmappable warning", LuminTranslatorSelfTest::testUnmappable);
         section("translate: uniform mapping", LuminTranslatorSelfTest::testUniformMapping);
+        section("translate: shaderpack uniform block", LuminTranslatorSelfTest::testUniformBlockMapping);
         section("translate: unavailable uniform", LuminTranslatorSelfTest::testUniformUnavailable);
         section("translate: comments protected", LuminTranslatorSelfTest::testComments);
         section("translate: no duplicate declarations", LuminTranslatorSelfTest::testNoDuplicates);
@@ -225,21 +226,49 @@ public final class LuminTranslatorSelfTest {
     private static void testUniformUnavailable() {
         String source = """
                 #version 120
-                uniform vec3 sunPosition;
+                uniform vec3 previousCameraPosition;
                 void main() {
-                    gl_FragColor = vec4(sunPosition, 1.0);
+                    gl_FragColor = vec4(previousCameraPosition, 1.0);
                 }
                 """;
         ShaderpackTranslator.Result result = ShaderpackTranslator.translate(
                 source, LuminShaderKind.FRAGMENT, 1);
         check(result.diagnostics().stream().anyMatch(d ->
                         d.severity() == Diagnostic.Severity.WARNING
-                                && d.message().contains("sunPosition")),
+                                && d.message().contains("previousCameraPosition")),
                 "unavailable uniform must produce a warning");
-        check(result.source().contains("uniform vec3 sunPosition;"),
+        check(result.source().contains("uniform vec3 previousCameraPosition;"),
                 "unavailable uniform declaration must be preserved");
         check(result.source().contains("out vec4 fragColor;"),
                 "other rewrites must still apply");
+    }
+
+    /** 引擎 SHADERPACK_UNIFORMS 块映射：sunPosition/rainStrength 等 → 块成员。 */
+    private static void testUniformBlockMapping() {
+        String source = """
+                #version 120
+                uniform vec3 sunPosition;
+                uniform float rainStrength;
+                uniform int worldTime;
+                void main() {
+                    gl_FragColor = vec4(sunPosition * rainStrength, float(worldTime));
+                }
+                """;
+        ShaderpackTranslator.Result result = ShaderpackTranslator.translate(
+                source, LuminShaderKind.FRAGMENT, 1);
+        String out = result.source();
+        check(out.contains("uniform ShaderpackUniforms"), "block declaration injected");
+        check(out.contains("#define sunPosition ShaderpackUniforms.SunPosition.xyz"),
+                "sunPosition maps to block member");
+        check(out.contains("#define rainStrength ShaderpackUniforms.RainStrength"),
+                "rainStrength maps to block member");
+        check(out.contains("#define worldTime ShaderpackUniforms.WorldTime"),
+                "worldTime maps to block member");
+        check(!out.contains("uniform vec3 sunPosition;"),
+                "mapped uniform declaration must be removed");
+        check(result.diagnostics().stream().noneMatch(d ->
+                        d.message().contains("sunPosition")),
+                "mapped uniform must not warn as unavailable");
     }
 
     private static void testNoDuplicates() {

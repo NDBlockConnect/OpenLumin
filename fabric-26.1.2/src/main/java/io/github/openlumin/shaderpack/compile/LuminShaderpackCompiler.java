@@ -19,6 +19,7 @@ import io.github.openlumin.shaderpack.ShaderpackIR;
 import io.github.openlumin.shaderpack.capability.LuminCapabilityNegotiator;
 import io.github.openlumin.shaderpack.capability.LuminCapabilityReport;
 import io.github.openlumin.shaderpack.capability.LuminCapabilitySet;
+import io.github.openlumin.shaderpack.frame.LuminShaderpackUniformBlock;
 import io.github.openlumin.shaderpack.graph.LuminPassNode;
 import io.github.openlumin.shaderpack.graph.LuminResourceId;
 import io.github.openlumin.shaderpack.graph.PassGraph;
@@ -157,8 +158,14 @@ public final class LuminShaderpackCompiler {
                                     + "' has no fragment stage; skipped"));
                     continue;
                 }
-                buildCompositePipeline(ir, program, source, node, pipelines, diagnostics);
-                collectShaderResources(ir, source, shaderResources, diagnostics);
+                Map<String, String> programResources = new LinkedHashMap<>();
+                collectShaderResources(ir, source, programResources, diagnostics);
+                boolean usesUniformBlock = programResources.values().stream()
+                        .anyMatch(text -> text.contains(
+                                "uniform " + LuminShaderpackUniformBlock.BLOCK_NAME));
+                buildCompositePipeline(ir, program, source, node, pipelines, diagnostics,
+                        usesUniformBlock);
+                shaderResources.putAll(programResources);
                 if (!source.has(LuminShaderKind.VERTEX)) {
                     shaderResources.putIfAbsent(FULLSCREEN_VERTEX_RESOURCE, FULLSCREEN_VERTEX_SOURCE);
                 }
@@ -197,7 +204,8 @@ public final class LuminShaderpackCompiler {
                                                LuminProgramSource source,
                                                LuminPassNode node,
                                                Map<LuminProgramId, RenderPipeline> out,
-                                               List<Diagnostic> diagnostics) {
+                                               List<Diagnostic> diagnostics,
+                                               boolean usesShaderpackUniforms) {
         boolean hasVertex = source.has(LuminShaderKind.VERTEX);
         if (hasVertex) {
             diagnostics.add(Diagnostic.info(source.id().sourceBaseName(), 0,
@@ -214,6 +222,10 @@ public final class LuminShaderpackCompiler {
                 .withUniform("Projection", UniformType.UNIFORM_BUFFER)
                 .withCull(false)
                 .withDepthStencilState(Optional.empty());
+        if (usesShaderpackUniforms) {
+            builder.withUniform(LuminShaderpackUniformBlock.BLOCK_NAME,
+                    UniformType.UNIFORM_BUFFER);
+        }
 
         applyBlend(ir, program, builder, diagnostics);
         for (LuminResourceId resource : node.reads()) {

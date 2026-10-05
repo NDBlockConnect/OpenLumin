@@ -24,7 +24,8 @@ public record LuminFrameUniforms(
         float isEyeInWater,
         float nightVision,
         float blindness,
-        float darknessFactor) {
+        float darknessFactor,
+        double[] playerEyePosition) {
 
     /** frameCounter 回绕周期（Iris 取证）。 */
     public static final int FRAME_COUNTER_WRAP = 720720;
@@ -37,6 +38,7 @@ public record LuminFrameUniforms(
         shadowLightPosition = shadowLightPosition.clone();
         upPosition = upPosition.clone();
         cameraPosition = cameraPosition.clone();
+        playerEyePosition = playerEyePosition.clone();
     }
 
     @Override
@@ -62,6 +64,11 @@ public record LuminFrameUniforms(
     @Override
     public double[] cameraPosition() {
         return cameraPosition.clone();
+    }
+
+    @Override
+    public double[] playerEyePosition() {
+        return playerEyePosition.clone();
     }
 
     /**
@@ -107,6 +114,7 @@ public record LuminFrameUniforms(
                 in.isEyeInWater(),
                 in.nightVision(),
                 in.blindness(),
-                in.darknessFactor());
+                in.darknessFactor(),
+                new double[]{in.eyePosX(), in.eyePosY(), in.eyePosZ()});
     }
 }

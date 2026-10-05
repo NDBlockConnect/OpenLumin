@@ -46,6 +46,7 @@ public final class LuminShaderpackM3SelfTest {
         section("capability optional split wired", LuminShaderpackM3SelfTest::testCapabilityOptionalSplit);
         section("resource/frame plan wired", LuminShaderpackM3SelfTest::testPlansWired);
         section("translation wired", LuminShaderpackM3SelfTest::testTranslationWired);
+        section("uniform block wired", LuminShaderpackM3SelfTest::testUniformBlockWired);
         section("error pack refused", LuminShaderpackM3SelfTest::testErrorRefused);
         if (failures > 0) {
             System.err.println("[lumin-shaderpack M3] " + failures + " section(s) FAILED");
@@ -311,5 +312,32 @@ public final class LuminShaderpackM3SelfTest {
         check(pipeline.getUniforms().stream()
                         .anyMatch(u -> u.name().equals("Projection")),
                 "composite pipeline must declare Projection");
+    }
+
+    /** 使用引擎内建 uniform 的源：块注入 + 管线按需声明 ShaderpackUniforms。 */
+    private static void testUniformBlockWired() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("shaders/composite1.fsh", """
+                #version 120
+                uniform vec3 sunPosition;
+                uniform float rainStrength;
+                void main() {
+                    gl_FragColor = vec4(sunPosition * rainStrength, 1.0);
+                }
+                """);
+        CompiledShaderpack compiled = compile(files);
+        check(!compiled.hasErrors(), "block-using pack must compile: " + compiled.errors());
+        String deployed = compiled.shaderResources().get("shaders/shaderpack/composite1.fsh");
+        check(deployed != null && deployed.contains("uniform ShaderpackUniforms"),
+                "ShaderpackUniforms block must be injected into the deployed source");
+        check(deployed.contains("#define sunPosition ShaderpackUniforms.SunPosition.xyz"),
+                "sunPosition macro must target the block member");
+
+        LuminProgramId composite1 = LuminProgramId.numbered(LuminProgramGroup.COMPOSITE, 1);
+        RenderPipeline pipeline = compiled.pipelineFor(composite1);
+        check(pipeline != null, "composite pipeline must exist");
+        check(pipeline.getUniforms().stream()
+                        .anyMatch(u -> u.name().equals("ShaderpackUniforms")),
+                "pipeline must declare ShaderpackUniforms when the shader uses it");
     }
 }

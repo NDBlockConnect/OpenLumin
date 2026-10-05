@@ -2,6 +2,7 @@ package io.github.openlumin.shaderpack.translate;
 
 import io.github.openlumin.shaderpack.Diagnostic;
 import io.github.openlumin.shaderpack.LuminShaderKind;
+import io.github.openlumin.shaderpack.frame.LuminShaderpackUniformBlock;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -64,9 +65,7 @@ public final class ShaderpackTranslator {
     private static final Map<String, Set<String>> UNIFORM_MAPPING_BLOCKS = new LinkedHashMap<>();
     /** 引擎暂未提供的内建 uniform（保留声明并出 WARNING，不静默零值）。 */
     private static final List<String> KNOWN_UNAVAILABLE_UNIFORMS = List.of(
-            "previousCameraPosition", "sunPosition", "moonPosition", "shadowLightPosition",
-            "upPosition", "worldTime", "frameTimeCounter", "frameCounter", "rainStrength",
-            "wetness", "skyColor", "eyeAltitude", "eyePosition", "isEyeInWater");
+            "previousCameraPosition", "skyColor");
 
     static {
         registerMapping("gbufferModelView", "ModelViewMat", "DynamicTransforms");
@@ -75,6 +74,42 @@ public final class ShaderpackTranslator {
         registerMapping("gbufferProjectionInverse", "inverse(ProjMat)", "Projection");
         registerMapping("cameraPosition", "(vec3(CameraBlockPos) + CameraOffset)", "Globals");
         registerMapping("fogColor", "FogColor.rgb", "Fog");
+        registerMapping("sunPosition",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".SunPosition.xyz", "ShaderpackUniforms");
+        registerMapping("moonPosition",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".MoonPosition.xyz", "ShaderpackUniforms");
+        registerMapping("shadowLightPosition",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".ShadowLightPosition.xyz",
+                "ShaderpackUniforms");
+        registerMapping("upPosition",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".UpPosition.xyz", "ShaderpackUniforms");
+        registerMapping("eyePosition",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".EyePosition.xyz", "ShaderpackUniforms");
+        registerMapping("worldTime",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".WorldTime", "ShaderpackUniforms");
+        registerMapping("worldDay",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".WorldDay", "ShaderpackUniforms");
+        registerMapping("frameCounter",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".FrameCounter", "ShaderpackUniforms");
+        registerMapping("frameTime",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".FrameTime", "ShaderpackUniforms");
+        registerMapping("frameTimeCounter",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".FrameTimeCounter", "ShaderpackUniforms");
+        registerMapping("rainStrength",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".RainStrength", "ShaderpackUniforms");
+        registerMapping("wetness",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".Wetness", "ShaderpackUniforms");
+        registerMapping("eyeAltitude",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".EyeAltitude", "ShaderpackUniforms");
+        registerMapping("isEyeInWater",
+                "int(" + LuminShaderpackUniformBlock.BLOCK_NAME + ".IsEyeInWater)",
+                "ShaderpackUniforms");
+        registerMapping("nightVision",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".NightVision", "ShaderpackUniforms");
+        registerMapping("blindness",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".Blindness", "ShaderpackUniforms");
+        registerMapping("darknessFactor",
+                LuminShaderpackUniformBlock.BLOCK_NAME + ".DarknessFactor", "ShaderpackUniforms");
     }
 
     private static void registerMapping(String name, String replacement, String... blocks) {
@@ -211,13 +246,15 @@ public final class ShaderpackTranslator {
         if (containsIdent(code, "ProjMat")) {
             requiredBlocks.add("Projection");
         }
-        for (String block : List.of("DynamicTransforms", "Projection", "Globals", "Fog")) {
+        for (String block : List.of("DynamicTransforms", "Projection", "Globals", "Fog",
+                LuminShaderpackUniformBlock.BLOCK_NAME)) {
             if (requiredBlocks.contains(block) && !code.contains("uniform " + block)) {
                 prelude.append(switch (block) {
                     case "DynamicTransforms" -> DYNAMIC_TRANSFORMS_BLOCK;
                     case "Projection" -> PROJECTION_BLOCK;
                     case "Globals" -> GLOBALS_BLOCK;
                     case "Fog" -> FOG_BLOCK;
+                    case "ShaderpackUniforms" -> LuminShaderpackUniformBlock.glslDeclaration();
                     default -> "";
                 });
             }

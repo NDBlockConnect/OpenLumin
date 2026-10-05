@@ -8,9 +8,9 @@ dependencies {
 
 tasks.register<JavaExec>("selfTest") {
     group = "verification"
-    description = "Runs lumin-shaderpack M1..M2 + M6 capability + preprocessor + M4 plan + translator + frame uniforms self tests (aggregated, no JUnit dependency)."
+    description = "Runs lumin-shaderpack M1..M2 + M6 capability + preprocessor + M4 plan + translator + frame uniforms + UBO block self tests (aggregated, no JUnit dependency)."
     classpath = sourceSets["test"].runtimeClasspath
-    mainClass = "io.github.openlumin.shaderpack.LuminFrameUniformsSelfTest"
+    mainClass = "io.github.openlumin.shaderpack.LuminUniformBlockSelfTest"
     maxHeapSize = "256m"
     jvmArgs("-XX:+UseSerialGC")
 }

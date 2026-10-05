@@ -25,6 +25,8 @@ import org.joml.Matrix4f;
  * @param nightVision        夜视强度 [0,1]
  * @param blindness         失明强度 [0,1]
  * @param darknessFactor    黑暗效果强度 [0,1]
+ * @param eyePosX/eyePosY/eyePosZ 相机**实体**眼位世界坐标（double；与 cameraPosition
+ *                          不同——第三人称时两者分离，Iris {@code eyePosition} 语义）
  */
 public record LuminFrameUniformInputs(
         float rawSunAngle,
@@ -44,7 +46,10 @@ public record LuminFrameUniformInputs(
         float isEyeInWater,
         float nightVision,
         float blindness,
-        float darknessFactor) {
+        float darknessFactor,
+        double eyePosX,
+        double eyePosY,
+        double eyePosZ) {
 
     public LuminFrameUniformInputs {
         if (gbufferModelView == null) {
