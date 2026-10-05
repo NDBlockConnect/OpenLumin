@@ -41,6 +41,8 @@ sourceSets {
     main {
         java {
             srcDir file('../fabric-26.1.2/src/main/java')
+            srcDir file('../lumin-shaderpack/src/main/java')
+            srcDir file('../lumin-chunk/src/main/java')
             // 排除 Fabric 加载器入口与平台实现（NeoForge 有自己的副本）
             exclude 'io/github/openlumin/OpenLuminFabric2612Client.java'
             exclude 'io/github/openlumin/platform/Fabric2612Platform.java'

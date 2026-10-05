@@ -22,6 +22,16 @@ dependencies {
     compileOnly "org.jetbrains:annotations:24.0.1"
 }
 
+// 纯库模块源码并入平台 JAR（运行时自包含；mavenLocal 依赖仅用于编译期解析）
+sourceSets {
+    main {
+        java {
+            srcDir file('../lumin-shaderpack/src/main/java')
+            srcDir file('../lumin-chunk/src/main/java')
+        }
+    }
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.release = 25
 }
