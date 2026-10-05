@@ -247,7 +247,14 @@ clear images → shadow compute → setup(compute) → begin → shadow → prep
   `ShaderpackTargets`（惰性纹理分配 + 格式降级显式告警——26.1.2 TextureFormat 仅 4 种）
   + `ShaderpackFrameExecutor`（UBO 写入 → ARGB 清屏 → 逐 pass：bindDefaultUniforms +
   ShaderpackUniforms 按需绑定 + 采样器绑定 + `draw(3,1)` 全屏三角形；MRT 降级取最小目标并告警）。
-  **游戏内验证待做**（需 mdl 实例重建后接入帧钩子）；
+  **游戏内首通 ✅（2026-10-05，提交 3cb40dc/719c41e）**：`openlumin-fabric-26.1.2` 实例实测——
+  自研最小 pack（legacy 120 风格 composite1/final）纯红输出全屏可见（PrintWindow 截图实证），
+  全链路零着色器错误/零执行失败。运行时关键修复：**26.1.2 自定义命名空间 shader 源注入**
+  （`ShaderManager$CompilationCache` mixin + 注册表；1.21.10 惰性读取无此问题而 26.1.2 预收集
+  路径不可达——历史"26.1.2 验证通过"记录已在 FACT 更正）、`#moj_import` 自展开（剥嵌套
+  `#version`）、**`draw(firstVertex, vertexCount)` 参数序修正（vanilla `draw(0,3)`；上文的
+  `draw(3,1)` 为修正前笔误）**、UBO 实例名、`USAGE_COPY_DST`、采样器声明取自翻译后源。
+  **待做**：正式时序（世界后/GUI 前）、MRT 多目标、公开 OptiFine pack 验收；
 - **M5（平台层）**：阴影 pass（正交 + 吸附 + 三种剔除档）；
 - **M6（能力协商核心）** ✅ **已实现（2026-10-05，提交 f35e480）**：纯 CPU
   `LuminCapabilityNegotiator`（required 缺失 → 明确拒绝并列出旗标，绝不静默降级；optional
