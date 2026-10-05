@@ -243,7 +243,11 @@ clear images → shadow compute → setup(compute) → begin → shadow → prep
   （格式/尺寸/清屏默认与指令覆盖、colortex main/alt 乒乓、按 (色,尺寸,乒乓) 分组清屏批 ≤32）+
   `LuminFramePlanner`（逐 pass 副本绑定解析——自反馈天然合法；竞争附着到消费者 pass）；
   `size.buffer` 语义按 Iris 取证实现（含小数点=相对、整数=绝对、双轴独立）。
-  **GPU 侧惰性分配与默认帧序执行（平台层）待做**；
+  **GPU 执行层已实现（2026-10-05，提交 8b50b32，26.1.2 GL 先行）**：
+  `ShaderpackTargets`（惰性纹理分配 + 格式降级显式告警——26.1.2 TextureFormat 仅 4 种）
+  + `ShaderpackFrameExecutor`（UBO 写入 → ARGB 清屏 → 逐 pass：bindDefaultUniforms +
+  ShaderpackUniforms 按需绑定 + 采样器绑定 + `draw(3,1)` 全屏三角形；MRT 降级取最小目标并告警）。
+  **游戏内验证待做**（需 mdl 实例重建后接入帧钩子）；
 - **M5（平台层）**：阴影 pass（正交 + 吸附 + 三种剔除档）；
 - **M6（能力协商核心）** ✅ **已实现（2026-10-05，提交 f35e480）**：纯 CPU
   `LuminCapabilityNegotiator`（required 缺失 → 明确拒绝并列出旗标，绝不静默降级；optional
