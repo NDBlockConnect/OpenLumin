@@ -223,8 +223,11 @@ clear images → shadow compute → setup(compute) → begin → shadow → prep
   版本归一（pre-330 → 330）、`attribute/varying`、`gl_*` 内建属性、`texture2D/3D/Cube`、
   `ftransform()`、`gl_FragColor/gl_FragData` → 显式输出声明；按引用注入属性/输出/UBO 声明
   （与 26.1.2 原生 include 逐字节同构）；注释放行保护；不可映射符号（`gl_FogFragCoord`/
-  `gl_ModelViewMatrix`/`shadow2D` 等）出 WARNING 清单。**均匀名映射（gbufferModelView →
-  ModelViewMat 等完整矩阵/相机 uniform 表）待做**；
+  `gl_ModelViewMatrix`/`shadow2D` 等）出 WARNING 清单。**均匀名映射（提交 e06ab9d）**：
+  `gbufferModelView/Projection(+Inverse)`、`cameraPosition`（= vec3(CameraBlockPos)+CameraOffset）、
+  `fogColor`（= FogColor.rgb）经宏定义映射到引擎 UBO 并移除原声明；引擎暂未提供的内建
+  （`sunPosition`/`worldTime`/`rainStrength` 等）保留声明并出 WARNING。
+  **太阳/月亮/天气/时间类 uniform 需引擎侧计算后补齐**；
 - **M3（平台层）** ✅ **首片（2026-10-05，提交 8cb6e12/6304818/4595489）**：
   `ShaderpackIR`+`PassGraph` → 逐程序 `RenderPipeline`（26.1.2 GL 先行）。合成族 pass 采用
   引擎全屏三角形约定（`gl_VertexID`、EMPTY+TRIANGLES，与 vanilla `minecraft:core/screenquad`
