@@ -8,12 +8,16 @@ import com.mojang.blaze3d.platform.SourceFactor;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import io.github.openlumin.shaderpack.Diagnostic;
+import io.github.openlumin.shaderpack.LuminFeatureFlag;
 import io.github.openlumin.shaderpack.LuminPackDirectives;
 import io.github.openlumin.shaderpack.LuminProgramGroup;
 import io.github.openlumin.shaderpack.LuminProgramId;
 import io.github.openlumin.shaderpack.LuminProgramSource;
 import io.github.openlumin.shaderpack.LuminShaderKind;
 import io.github.openlumin.shaderpack.ShaderpackIR;
+import io.github.openlumin.shaderpack.capability.LuminCapabilityNegotiator;
+import io.github.openlumin.shaderpack.capability.LuminCapabilityReport;
+import io.github.openlumin.shaderpack.capability.LuminCapabilitySet;
 import io.github.openlumin.shaderpack.graph.LuminPassNode;
 import io.github.openlumin.shaderpack.graph.LuminResourceId;
 import io.github.openlumin.shaderpack.graph.PassGraph;
@@ -44,6 +48,17 @@ public final class LuminShaderpackCompiler {
 
     private static final String NAMESPACE = "openlumin";
     private static final String SHADER_BASE = "shaderpack/";
+
+    /**
+     * 26.1.2 GL 路径的引擎能力集（WP-2 M6）。
+     *
+     * <p><b>保守原则</b>：只登记当前引擎确实具备的能力，未实现的（compute/SSBO/图像/
+     * 逐缓冲混合/曲面细分/运动向量等）一律不登记——包声明 required 时会明确拒绝，
+     * 声明 optional 时以 false 提供，绝不静默降级。</p>
+     */
+    public static final LuminCapabilitySet GL_PATH_CAPABILITIES = LuminCapabilitySet.of(
+            // 26.1.2 渲染 API 围绕独立 GpuSampler 一等对象构建（管线以 withSampler 绑定）
+            LuminFeatureFlag.SEPARATE_HARDWARE_SAMPLERS);
 
     /**
      * 内建全屏顶点着色器（合成 pass 缺 vsh 时的回退）。
@@ -92,7 +107,20 @@ public final class LuminShaderpackCompiler {
                     "pack contains parse errors; refusing to compile ("
                             + ir.errors().size() + " error(s))"));
             return new CompiledShaderpack(ir, graph, Map.of(), List.of(),
-                    Map.of(), diagnostics);
+                    Map.of(), LuminCapabilityReport.notNegotiated(), diagnostics);
+        }
+
+        // WP-2 M6：能力协商先行——required 缺失即明确拒绝（设计 §5，不静默降级）
+        LuminCapabilityReport capabilityReport =
+                LuminCapabilityNegotiator.negotiate(ir, GL_PATH_CAPABILITIES);
+        if (!capabilityReport.accepted()) {
+            diagnostics.add(Diagnostic.error(
+                    ir.metadata().source(), 0,
+                    "pack requires unsupported feature(s): "
+                            + capabilityReport.missingRequired()
+                            + "; refusing to compile (" + capabilityReport.describe() + ")"));
+            return new CompiledShaderpack(ir, graph, Map.of(), List.of(),
+                    Map.of(), capabilityReport, diagnostics);
         }
 
         Map<LuminProgramId, RenderPipeline> pipelines = new LinkedHashMap<>();
@@ -132,7 +160,7 @@ public final class LuminShaderpackCompiler {
             }
         }
         return new CompiledShaderpack(ir, graph, pipelines, executionOrder,
-                shaderResources, diagnostics);
+                shaderResources, capabilityReport, diagnostics);
     }
 
     /** 合成族：全屏四边形 pass（非几何替换）。 */

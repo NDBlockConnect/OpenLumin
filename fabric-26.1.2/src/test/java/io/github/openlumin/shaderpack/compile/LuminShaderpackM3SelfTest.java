@@ -41,6 +41,8 @@ public final class LuminShaderpackM3SelfTest {
         section("fullscreen vertex fallback", LuminShaderpackM3SelfTest::testFullscreenFallback);
         section("compute pass deferred", LuminShaderpackM3SelfTest::testComputeDeferred);
         section("geometry pass deferred", LuminShaderpackM3SelfTest::testGeometryDeferred);
+        section("capability rejection wired", LuminShaderpackM3SelfTest::testCapabilityRejection);
+        section("capability optional split wired", LuminShaderpackM3SelfTest::testCapabilityOptionalSplit);
         section("error pack refused", LuminShaderpackM3SelfTest::testErrorRefused);
         if (failures > 0) {
             System.err.println("[lumin-shaderpack M3] " + failures + " section(s) FAILED");
@@ -210,5 +212,37 @@ public final class LuminShaderpackM3SelfTest {
         } else {
             check(!compiled.hasErrors(), "clean pack must compile");
         }
+    }
+
+    /** required 缺失必须明确拒绝（不静默降级）：无管线、ERROR 诊断、报告列出缺失旗标。 */
+    private static void testCapabilityRejection() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("shaders/shaders.properties", "iris.features.required = COMPUTE_SHADERS\n");
+        files.put("shaders/composite1.fsh", "/* DRAWBUFFERS:0 */\nvoid main(){}\n");
+        CompiledShaderpack compiled = compile(files);
+        check(compiled.hasErrors(), "missing required feature must fail compilation");
+        check(compiled.pipelines().isEmpty(), "rejected pack must not produce pipelines");
+        check(compiled.capabilityReport().missingRequired().contains(
+                        io.github.openlumin.shaderpack.LuminFeatureFlag.COMPUTE_SHADERS),
+                "report must list the missing flag");
+        check(compiled.errors().stream().anyMatch(
+                        d -> d.message().contains("unsupported feature")),
+                "rejection must be recorded as an ERROR diagnostic");
+    }
+
+    /** optional 拆分：支持者 provided、不支持者 unavailable，且不影响编译。 */
+    private static void testCapabilityOptionalSplit() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("shaders/shaders.properties",
+                "iris.features.optional = SEPARATE_HARDWARE_SAMPLERS CUSTOM_IMAGES\n");
+        files.put("shaders/composite1.fsh", "/* DRAWBUFFERS:0 */\nvoid main(){}\n");
+        CompiledShaderpack compiled = compile(files);
+        check(!compiled.hasErrors(), "optional gaps must not reject: " + compiled.errors());
+        check(compiled.capabilityReport().providedOptional().contains(
+                        io.github.openlumin.shaderpack.LuminFeatureFlag.SEPARATE_HARDWARE_SAMPLERS),
+                "supported optional must be provided");
+        check(compiled.capabilityReport().unavailableOptional().contains(
+                        io.github.openlumin.shaderpack.LuminFeatureFlag.CUSTOM_IMAGES),
+                "unsupported optional must be marked unavailable");
     }
 }
