@@ -219,13 +219,23 @@ clear images → shadow compute → setup(compute) → begin → shadow → prep
 - **预处理层（第 2 层）** ✅ **已实现（2026-10-05，提交 4595489）**：`ShaderpackPreprocessor`——
   include 展开（include guard 无效语义回归锁定）、`#version/#extension` 顶部回填（含冲突检测）、
   选项/环境 define 注入；`ShaderpackIR` 携带 include 图、`LuminProgramSource` 记录阶段源路径；
+- **GLSL 翻译层（编译前段）** ✅ **首片（2026-10-05，提交 7fe673b）**：`ShaderpackTranslator`——
+  版本归一（pre-330 → 330）、`attribute/varying`、`gl_*` 内建属性、`texture2D/3D/Cube`、
+  `ftransform()`、`gl_FragColor/gl_FragData` → 显式输出声明；按引用注入属性/输出/UBO 声明
+  （与 26.1.2 原生 include 逐字节同构）；注释放行保护；不可映射符号（`gl_FogFragCoord`/
+  `gl_ModelViewMatrix`/`shadow2D` 等）出 WARNING 清单。**均匀名映射（gbufferModelView →
+  ModelViewMat 等完整矩阵/相机 uniform 表）待做**；
 - **M3（平台层）** ✅ **首片（2026-10-05，提交 8cb6e12/6304818/4595489）**：
   `ShaderpackIR`+`PassGraph` → 逐程序 `RenderPipeline`（26.1.2 GL 先行）。合成族 pass 采用
   引擎全屏三角形约定（`gl_VertexID`、EMPTY+TRIANGLES，与 vanilla `minecraft:core/screenquad`
   同构）；缺 vsh 的包回退内建 `openlumin:shaderpack/_fullscreen`；部署源经预处理（include 展开 +
   版本回填）；blend 指令 int 编码 → 26.1.2 枚举。**compute 程序显式延后**（26.1.2 pipeline 包
   无计算管线抽象，javap 实证）；几何 pass 延后至 M7（WP-1 接线）；
-- **M4（平台层）**：资源模型（colortex/depthtex/shadowtex + 乒乓 + 清屏批处理）+ 默认帧序执行；
+- **M4（平台层）** 🟡 **规划层已实现（2026-10-05，提交 0d4d644）**：`LuminResourcePlanner`
+  （格式/尺寸/清屏默认与指令覆盖、colortex main/alt 乒乓、按 (色,尺寸,乒乓) 分组清屏批 ≤32）+
+  `LuminFramePlanner`（逐 pass 副本绑定解析——自反馈天然合法；竞争附着到消费者 pass）；
+  `size.buffer` 语义按 Iris 取证实现（含小数点=相对、整数=绝对、双轴独立）。
+  **GPU 侧惰性分配与默认帧序执行（平台层）待做**；
 - **M5（平台层）**：阴影 pass（正交 + 吸附 + 三种剔除档）；
 - **M6（能力协商核心）** ✅ **已实现（2026-10-05，提交 f35e480）**：纯 CPU
   `LuminCapabilityNegotiator`（required 缺失 → 明确拒绝并列出旗标，绝不静默降级；optional
