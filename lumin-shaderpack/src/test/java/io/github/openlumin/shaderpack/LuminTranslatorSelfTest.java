@@ -26,6 +26,8 @@ public final class LuminTranslatorSelfTest {
         section("translate: multi draw outputs", LuminTranslatorSelfTest::testMultiOutputs);
         section("translate: modern passthrough", LuminTranslatorSelfTest::testModernPassthrough);
         section("translate: unmappable warning", LuminTranslatorSelfTest::testUnmappable);
+        section("translate: uniform mapping", LuminTranslatorSelfTest::testUniformMapping);
+        section("translate: unavailable uniform", LuminTranslatorSelfTest::testUniformUnavailable);
         section("translate: comments protected", LuminTranslatorSelfTest::testComments);
         section("translate: no duplicate declarations", LuminTranslatorSelfTest::testNoDuplicates);
         if (failures > 0) {
@@ -183,6 +185,61 @@ public final class LuminTranslatorSelfTest {
                 "comment content must be preserved verbatim");
         check(translated.source().contains("fragColor = vec4(1.0);"),
                 "code outside comments must be rewritten");
+    }
+
+    /** 内建 uniform 映射：声明移除 + 宏定义 + 依赖 UBO 块按需注入。 */
+    private static void testUniformMapping() {
+        String source = """
+                #version 120
+                uniform mat4 gbufferModelView;
+                uniform mat4 gbufferProjection;
+                uniform vec3 cameraPosition;
+                uniform vec3 fogColor;
+                varying vec2 texcoord;
+                void main() {
+                    gl_Position = gbufferProjection * gbufferModelView * vec4(gl_Vertex, 1.0);
+                    texcoord = gl_MultiTexCoord0.xy;
+                }
+                """;
+        ShaderpackTranslator.Result result = ShaderpackTranslator.translate(
+                source, LuminShaderKind.VERTEX, 1);
+        String out = result.source();
+        check(!out.contains("uniform mat4 gbufferModelView;"),
+                "mapped uniform declaration must be removed");
+        check(out.contains("#define gbufferModelView ModelViewMat"), "matrix macro injected");
+        check(out.contains("#define gbufferProjection ProjMat"), "projection macro injected");
+        check(out.contains("#define cameraPosition (vec3(CameraBlockPos) + CameraOffset)"),
+                "cameraPosition derived from Globals (byte-verified semantics)");
+        check(out.contains("#define fogColor FogColor.rgb"), "fogColor mapped to Fog block rgb");
+        check(out.contains("uniform DynamicTransforms"), "DynamicTransforms block injected");
+        check(out.contains("uniform Projection"), "Projection block injected");
+        check(out.contains("uniform Globals"), "Globals block injected");
+        check(out.contains("uniform Fog"), "Fog block injected");
+        check(out.indexOf("#define gbufferModelView") > out.indexOf("uniform DynamicTransforms"),
+                "macro definitions must follow the block declarations");
+        check(out.contains("in vec3 Position;") && out.contains("in vec2 UV0;"),
+                "rewritten builtin attributes declared");
+    }
+
+    /** 引擎暂未提供的内建 uniform：保留声明 + WARNING（不静默零值）。 */
+    private static void testUniformUnavailable() {
+        String source = """
+                #version 120
+                uniform vec3 sunPosition;
+                void main() {
+                    gl_FragColor = vec4(sunPosition, 1.0);
+                }
+                """;
+        ShaderpackTranslator.Result result = ShaderpackTranslator.translate(
+                source, LuminShaderKind.FRAGMENT, 1);
+        check(result.diagnostics().stream().anyMatch(d ->
+                        d.severity() == Diagnostic.Severity.WARNING
+                                && d.message().contains("sunPosition")),
+                "unavailable uniform must produce a warning");
+        check(result.source().contains("uniform vec3 sunPosition;"),
+                "unavailable uniform declaration must be preserved");
+        check(result.source().contains("out vec4 fragColor;"),
+                "other rewrites must still apply");
     }
 
     private static void testNoDuplicates() {

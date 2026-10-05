@@ -53,6 +53,35 @@ public final class ShaderpackTranslator {
             "gl_ModelViewProjectionMatrix", "gl_NormalMatrix", "gl_TexCoord",
             "shadow2D", "shadow2DProj");
 
+    /**
+     * OptiFine/Iris 内建 uniform → 引擎表达式映射（宏定义方式；声明行移除）。
+     * <p>映射依据为 26.1.2 原生 UBO（逐字节取证自 MC jar 的 include 文件）：
+     * DynamicTransforms/Projection/Globals/Fog。派生量用 {@code inverse()}/算式表达，
+     * 避免 GLSL 330 全局初始化非常量表达式限制。</p>
+     */
+    private static final Map<String, String> UNIFORM_MAPPINGS = new LinkedHashMap<>();
+    /** 映射所依赖的 UBO 块名（DynamicTransforms/Projection/Globals/Fog）。 */
+    private static final Map<String, Set<String>> UNIFORM_MAPPING_BLOCKS = new LinkedHashMap<>();
+    /** 引擎暂未提供的内建 uniform（保留声明并出 WARNING，不静默零值）。 */
+    private static final List<String> KNOWN_UNAVAILABLE_UNIFORMS = List.of(
+            "previousCameraPosition", "sunPosition", "moonPosition", "shadowLightPosition",
+            "upPosition", "worldTime", "frameTimeCounter", "frameCounter", "rainStrength",
+            "wetness", "skyColor", "eyeAltitude", "eyePosition", "isEyeInWater");
+
+    static {
+        registerMapping("gbufferModelView", "ModelViewMat", "DynamicTransforms");
+        registerMapping("gbufferProjection", "ProjMat", "Projection");
+        registerMapping("gbufferModelViewInverse", "inverse(ModelViewMat)", "DynamicTransforms");
+        registerMapping("gbufferProjectionInverse", "inverse(ProjMat)", "Projection");
+        registerMapping("cameraPosition", "(vec3(CameraBlockPos) + CameraOffset)", "Globals");
+        registerMapping("fogColor", "FogColor.rgb", "Fog");
+    }
+
+    private static void registerMapping(String name, String replacement, String... blocks) {
+        UNIFORM_MAPPINGS.put(name, replacement);
+        UNIFORM_MAPPING_BLOCKS.put(name, Set.of(blocks));
+    }
+
     /** 26.1.2 原生 UBO 声明（与 vanilla include 同构；供 ftransform 等映射使用）。 */
     private static final String DYNAMIC_TRANSFORMS_BLOCK = """
             layout(std140) uniform DynamicTransforms {
@@ -65,6 +94,28 @@ public final class ShaderpackTranslator {
     private static final String PROJECTION_BLOCK = """
             layout(std140) uniform Projection {
                 mat4 ProjMat;
+            };
+            """;
+    private static final String GLOBALS_BLOCK = """
+            layout(std140) uniform Globals {
+                ivec3 CameraBlockPos;
+                vec3 CameraOffset;
+                vec2 ScreenSize;
+                float GlintAlpha;
+                float GameTime;
+                int MenuBlurRadius;
+                int UseRgss;
+            };
+            """;
+    private static final String FOG_BLOCK = """
+            layout(std140) uniform Fog {
+                vec4 FogColor;
+                float FogEnvironmentalStart;
+                float FogEnvironmentalEnd;
+                float FogRenderDistanceStart;
+                float FogRenderDistanceEnd;
+                float FogSkyEnd;
+                float FogCloudsEnd;
             };
             """;
 
@@ -106,6 +157,7 @@ public final class ShaderpackTranslator {
             }
         }
 
+        String original = code;
         boolean legacyVersion = hasPre330Version(code);
         code = VERSION_LINE.matcher(code).replaceAll("");
         code = replaceIdent(code, "attribute", "in");
@@ -129,20 +181,50 @@ public final class ShaderpackTranslator {
                 "fragData$1");
         code = replaceIdent(code, "gl_FragColor", "fragColor");
 
+        // 内建 uniform 映射：移除声明 + 宏定义 + 依赖块集合；未提供者出 WARNING
+        StringBuilder mappingDefines = new StringBuilder();
+        Set<String> requiredBlocks = new LinkedHashSet<>();
+        for (Map.Entry<String, String> entry : UNIFORM_MAPPINGS.entrySet()) {
+            String name = entry.getKey();
+            if (isDeclaredUniform(code, name) || containsIdent(code, name)) {
+                code = removeUniformDeclaration(code, name);
+                mappingDefines.append("#define ").append(name).append(' ')
+                        .append(entry.getValue()).append('\n');
+                requiredBlocks.addAll(UNIFORM_MAPPING_BLOCKS.get(name));
+            }
+        }
+        for (String name : KNOWN_UNAVAILABLE_UNIFORMS) {
+            if (containsIdent(code, name)) {
+                diagnostics.add(Diagnostic.warning("<translate>", 0,
+                        "engine does not provide uniform '" + name
+                                + "' yet; it will read as unbound"));
+            }
+        }
+
         StringBuilder prelude = new StringBuilder();
         if (legacyVersion || !VERSION_LINE.matcher(code).find()) {
             prelude.append("#version 330\n");
         }
-        if (containsIdent(code, "ProjMat") || containsIdent(code, "ModelViewMat")) {
-            if (!code.contains("uniform DynamicTransforms")) {
-                prelude.append(DYNAMIC_TRANSFORMS_BLOCK);
-            }
-            if (!code.contains("uniform Projection")) {
-                prelude.append(PROJECTION_BLOCK);
+        if (containsIdent(code, "ModelViewMat")) {
+            requiredBlocks.add("DynamicTransforms");
+        }
+        if (containsIdent(code, "ProjMat")) {
+            requiredBlocks.add("Projection");
+        }
+        for (String block : List.of("DynamicTransforms", "Projection", "Globals", "Fog")) {
+            if (requiredBlocks.contains(block) && !code.contains("uniform " + block)) {
+                prelude.append(switch (block) {
+                    case "DynamicTransforms" -> DYNAMIC_TRANSFORMS_BLOCK;
+                    case "Projection" -> PROJECTION_BLOCK;
+                    case "Globals" -> GLOBALS_BLOCK;
+                    case "Fog" -> FOG_BLOCK;
+                    default -> "";
+                });
             }
         }
-        prelude.append(attributeDeclarations(code));
-        prelude.append(fragmentOutputDeclarations(code, kind));
+        prelude.append(mappingDefines);
+        prelude.append(attributeDeclarations(code, original));
+        prelude.append(fragmentOutputDeclarations(code, original, kind));
 
         String restored = mask.restore(prelude + "\n" + code);
         return new Result(restored, diagnostics, true);
@@ -156,6 +238,16 @@ public final class ShaderpackTranslator {
                 "texture2D", "texture3D", "ftransform", "gl_Vertex", "gl_MultiTexCoord",
                 "gl_Normal", "gl_Color")) {
             if (containsIdent(code, marker)) {
+                return true;
+            }
+        }
+        for (String name : UNIFORM_MAPPINGS.keySet()) {
+            if (containsIdent(code, name)) {
+                return true;
+            }
+        }
+        for (String name : KNOWN_UNAVAILABLE_UNIFORMS) {
+            if (containsIdent(code, name)) {
                 return true;
             }
         }
@@ -186,7 +278,11 @@ public final class ShaderpackTranslator {
                 .matcher(code).replaceAll(Matcher.quoteReplacement(replacement));
     }
 
-    private static String attributeDeclarations(String code) {
+    /**
+     * 属性声明：仅对**由 gl_* 重写引入**的名字注入（依据原始文本判定），
+     * 避免现代包里的同名局部变量被误注入全局声明。
+     */
+    private static String attributeDeclarations(String code, String original) {
         Map<String, String> declarations = new LinkedHashMap<>();
         declarations.put("Position", "in vec3 Position;");
         declarations.put("UV0", "in vec2 UV0;");
@@ -194,23 +290,41 @@ public final class ShaderpackTranslator {
         declarations.put("UV2", "in vec2 UV2;");
         declarations.put("Normal", "in vec3 Normal;");
         declarations.put("Color", "in vec4 Color;");
+        Map<String, String> sources = Map.of(
+                "Position", "gl_Vertex",
+                "UV0", "gl_MultiTexCoord0",
+                "UV1", "gl_MultiTexCoord1",
+                "UV2", "gl_MultiTexCoord2",
+                "Normal", "gl_Normal",
+                "Color", "gl_Color");
         StringBuilder out = new StringBuilder();
+        boolean positionNeeded = containsIdent(original, "gl_Vertex")
+                || containsIdent(original, "ftransform");
         for (Map.Entry<String, String> entry : declarations.entrySet()) {
             String name = entry.getKey();
-            if (containsIdent(code, name) && !declaredAs(code, name)) {
+            boolean sourcePresent = name.equals("Position")
+                    ? positionNeeded
+                    : containsIdent(original, sources.get(name));
+            if (sourcePresent
+                    && containsIdent(code, name) && !declaredAs(code, name)) {
                 out.append(entry.getValue()).append('\n');
             }
         }
         return out.toString();
     }
 
-    private static String fragmentOutputDeclarations(String code, LuminShaderKind kind) {
+    private static String fragmentOutputDeclarations(String code, String original,
+                                                     LuminShaderKind kind) {
         if (kind != LuminShaderKind.FRAGMENT) {
             return "";
         }
         StringBuilder out = new StringBuilder();
-        if (containsIdent(code, "fragColor") && !declaredAs(code, "fragColor")) {
+        if (containsIdent(original, "gl_FragColor")
+                && containsIdent(code, "fragColor") && !declaredAs(code, "fragColor")) {
             out.append("out vec4 fragColor;\n");
+        }
+        if (!containsIdent(original, "gl_FragData")) {
+            return out.toString();
         }
         Set<String> dataOuts = new LinkedHashSet<>();
         Matcher matcher = Pattern.compile("(?<![A-Za-z0-9_])(fragData\\d+)(?![A-Za-z0-9_])")
@@ -224,6 +338,20 @@ public final class ShaderpackTranslator {
             }
         }
         return out.toString();
+    }
+
+    private static boolean isDeclaredUniform(String code, String name) {
+        return Pattern.compile("(?m)^[ \\t]*uniform\\s+"
+                        + "(?:(?:lowp|mediump|highp)\\s+)?\\w+\\s+"
+                        + Pattern.quote(name) + "\\s*;")
+                .matcher(code).find();
+    }
+
+    private static String removeUniformDeclaration(String code, String name) {
+        return Pattern.compile("(?m)^[ \\t]*uniform\\s+"
+                        + "(?:(?:lowp|mediump|highp)\\s+)?\\w+\\s+"
+                        + Pattern.quote(name) + "\\s*;[ \\t]*\\r?\\n?")
+                .matcher(code).replaceAll("");
     }
 
     private static boolean declaredAs(String code, String name) {
