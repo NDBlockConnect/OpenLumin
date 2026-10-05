@@ -5,6 +5,7 @@ import com.mojang.blaze3d.pipeline.ColorTargetState;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.DestFactor;
 import com.mojang.blaze3d.platform.SourceFactor;
+import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import io.github.openlumin.shaderpack.Diagnostic;
@@ -26,6 +27,7 @@ import io.github.openlumin.shaderpack.plan.LuminFramePlan;
 import io.github.openlumin.shaderpack.plan.LuminFramePlanner;
 import io.github.openlumin.shaderpack.plan.LuminResourcePlan;
 import io.github.openlumin.shaderpack.plan.LuminResourcePlanner;
+import io.github.openlumin.shaderpack.translate.ShaderpackTranslator;
 import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
@@ -207,6 +209,9 @@ public final class LuminShaderpackCompiler {
                 .withVertexFormat(DefaultVertexFormat.EMPTY, VertexFormat.Mode.TRIANGLES)
                 .withVertexShader(hasVertex ? shaderLocation(program) : FULLSCREEN_VERTEX_SHADER)
                 .withFragmentShader(shaderLocation(program))
+                // 翻译层注入的 UBO 块（与 26.1.2 原生 include 同构）需在此声明方可绑定
+                .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
+                .withUniform("Projection", UniformType.UNIFORM_BUFFER)
                 .withCull(false)
                 .withDepthStencilState(Optional.empty());
 
@@ -303,6 +308,10 @@ public final class LuminShaderpackCompiler {
                     diagnostics.addAll(preprocessed.diagnostics());
                     text = preprocessed.source();
                 }
+                ShaderpackTranslator.Result translated = ShaderpackTranslator.translate(
+                        text, kind, source.drawTargets().size());
+                diagnostics.addAll(translated.diagnostics());
+                text = translated.source();
                 out.put("shaders/" + SHADER_BASE + base + "." + kind.extension(), text);
             }
         }

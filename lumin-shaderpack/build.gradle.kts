@@ -3,9 +3,9 @@
 
 tasks.register<JavaExec>("selfTest") {
     group = "verification"
-    description = "Runs lumin-shaderpack M1..M2 + M6 capability + preprocessor + M4 plan self tests (aggregated, no JUnit dependency)."
+    description = "Runs lumin-shaderpack M1..M2 + M6 capability + preprocessor + M4 plan + translator self tests (aggregated, no JUnit dependency)."
     classpath = sourceSets["test"].runtimeClasspath
-    mainClass = "io.github.openlumin.shaderpack.LuminResourcePlanSelfTest"
+    mainClass = "io.github.openlumin.shaderpack.LuminTranslatorSelfTest"
     maxHeapSize = "256m"
     jvmArgs("-XX:+UseSerialGC")
 }

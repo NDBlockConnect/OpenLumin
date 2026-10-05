@@ -45,6 +45,7 @@ public final class LuminShaderpackM3SelfTest {
         section("capability rejection wired", LuminShaderpackM3SelfTest::testCapabilityRejection);
         section("capability optional split wired", LuminShaderpackM3SelfTest::testCapabilityOptionalSplit);
         section("resource/frame plan wired", LuminShaderpackM3SelfTest::testPlansWired);
+        section("translation wired", LuminShaderpackM3SelfTest::testTranslationWired);
         section("error pack refused", LuminShaderpackM3SelfTest::testErrorRefused);
         if (failures > 0) {
             System.err.println("[lumin-shaderpack M3] " + failures + " section(s) FAILED");
@@ -281,5 +282,34 @@ public final class LuminShaderpackM3SelfTest {
                         .anyMatch(step -> step instanceof
                                 io.github.openlumin.shaderpack.plan.LuminFramePlan.ClearStep),
                 "frame plan must start with clear steps");
+    }
+
+    /** legacy 源必须经翻译后部署；管线声明翻译层注入的 UBO 块。 */
+    private static void testTranslationWired() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("shaders/composite1.fsh", """
+                #version 120
+                uniform sampler2D colortex0;
+                void main() {
+                    gl_FragColor = texture2D(colortex0, vec2(0.0));
+                }
+                """);
+        CompiledShaderpack compiled = compile(files);
+        check(!compiled.hasErrors(), "legacy pack must compile: " + compiled.errors());
+        String deployed = compiled.shaderResources().get("shaders/shaderpack/composite1.fsh");
+        check(deployed != null, "legacy fragment source must be deployed");
+        check(deployed.startsWith("#version 330"), "version normalized on deployment");
+        check(deployed.contains("out vec4 fragColor;"), "fragment output injected");
+        check(!deployed.contains("gl_FragColor"), "legacy output symbol consumed");
+
+        LuminProgramId composite1 = LuminProgramId.numbered(LuminProgramGroup.COMPOSITE, 1);
+        RenderPipeline pipeline = compiled.pipelineFor(composite1);
+        check(pipeline != null, "composite pipeline must exist");
+        check(pipeline.getUniforms().stream()
+                        .anyMatch(u -> u.name().equals("DynamicTransforms")),
+                "composite pipeline must declare DynamicTransforms");
+        check(pipeline.getUniforms().stream()
+                        .anyMatch(u -> u.name().equals("Projection")),
+                "composite pipeline must declare Projection");
     }
 }
