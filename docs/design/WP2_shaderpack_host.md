@@ -225,9 +225,14 @@ clear images → shadow compute → setup(compute) → begin → shadow → prep
   （与 26.1.2 原生 include 逐字节同构）；注释放行保护；不可映射符号（`gl_FogFragCoord`/
   `gl_ModelViewMatrix`/`shadow2D` 等）出 WARNING 清单。**均匀名映射（提交 e06ab9d）**：
   `gbufferModelView/Projection(+Inverse)`、`cameraPosition`（= vec3(CameraBlockPos)+CameraOffset）、
-  `fogColor`（= FogColor.rgb）经宏定义映射到引擎 UBO 并移除原声明；引擎暂未提供的内建
-  （`sunPosition`/`worldTime`/`rainStrength` 等）保留声明并出 WARNING。
-  **太阳/月亮/天气/时间类 uniform 需引擎侧计算后补齐**；
+  `fogColor`（= FogColor.rgb）经宏定义映射到引擎 UBO 并移除原声明。
+  **引擎内建 uniform 块（提交 abef104/bf91431）**：`sunPosition`/`moonPosition`/
+  `shadowLightPosition`/`upPosition`/`eyePosition`/`worldTime`/`worldDay`/`frameCounter`/
+  `frameTime`/`frameTimeCounter`/`rainStrength`/`wetness`/`eyeAltitude`/`isEyeInWater`/
+  `nightVision`/`blindness`/`darknessFactor` 共 17 项经宏映射到 `ShaderpackUniforms` UBO
+  （std140 布局引擎推导 + 手算偏移表锁定，144 B；序列化器 `LuminShaderpackUniformBlock`）；
+  值由帧数据层 `LuminFrameUniforms` 计算（天象角/位置公式、计数器回绕均按 Iris 取证）。
+  剩余未提供：`previousCameraPosition`/`skyColor`（保留声明 + WARNING）；
 - **M3（平台层）** ✅ **首片（2026-10-05，提交 8cb6e12/6304818/4595489）**：
   `ShaderpackIR`+`PassGraph` → 逐程序 `RenderPipeline`（26.1.2 GL 先行）。合成族 pass 采用
   引擎全屏三角形约定（`gl_VertexID`、EMPTY+TRIANGLES，与 vanilla `minecraft:core/screenquad`
