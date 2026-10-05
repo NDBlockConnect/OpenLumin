@@ -48,6 +48,13 @@ import java.util.Set;
  */
 public final class ShaderpackFrameExecutor implements AutoCloseable {
 
+    /**
+     * 全屏三角形绘制参数（26.1.2 {@code RenderPass.draw(firstVertex, vertexCount)} 语义——
+     * vanilla PostPass 实证为 {@code draw(0, 3)}；早期误写 {@code draw(3, 1)} 只画 1 个顶点。
+     */
+    public static final int FULLSCREEN_FIRST_VERTEX = 0;
+    public static final int FULLSCREEN_VERTEX_COUNT = 3;
+
     private final CompiledShaderpack compiled;
     private ShaderpackTargets targets;
     private GpuBuffer uniformBuffer;
@@ -81,6 +88,19 @@ public final class ShaderpackFrameExecutor implements AutoCloseable {
      */
     public void execute(GpuSampler sampler, int viewportWidth, int viewportHeight,
                         int fogColorArgb, LuminFrameUniforms uniforms) {
+        execute(sampler, viewportWidth, viewportHeight, fogColorArgb, uniforms, null, null);
+    }
+
+    /**
+     * 执行一帧（可含种子输入与呈现输出，打通"MC 主目标 → pack 链 → MC 主目标"回路）。
+     *
+     * @param seedInput      非空时在清屏后把其内容拷入 colortex0 当前副本（尺寸必须一致）
+     * @param presentOutput  非空时在全部 pass 后把 colortex0 最终副本拷回（尺寸必须一致）
+     */
+    public void execute(GpuSampler sampler, int viewportWidth, int viewportHeight,
+                        int fogColorArgb, LuminFrameUniforms uniforms,
+                        com.mojang.blaze3d.textures.GpuTexture seedInput,
+                        com.mojang.blaze3d.textures.GpuTexture presentOutput) {
         if (closed) {
             throw new IllegalStateException("executor closed");
         }
@@ -94,11 +114,84 @@ public final class ShaderpackFrameExecutor implements AutoCloseable {
         CommandEncoder encoder = device.createCommandEncoder();
         writeUniforms(encoder, uniforms);
         clearTargets(encoder, fogColorArgb);
+        seedFrom(encoder, seedInput, viewportWidth, viewportHeight);
         for (LuminFramePlan.Step step : compiled.framePlan().steps()) {
             if (step instanceof LuminFramePlan.PassStep pass) {
                 executePass(encoder, pass, sampler);
             }
         }
+        presentTo(encoder, presentOutput, viewportWidth, viewportHeight);
+    }
+
+    /** 种子拷贝：MC 主目标 → colortex0 当前副本（全尺寸、零偏移；与 vanilla RenderTarget 同参）。 */
+    private void seedFrom(CommandEncoder encoder, com.mojang.blaze3d.textures.GpuTexture seedInput,
+                          int viewportWidth, int viewportHeight) {
+        if (seedInput == null) {
+            return;
+        }
+        LuminTargetId color0 = LuminTargetId.color(0);
+        var destination = targets.texture(color0, resolveInitialCopy(color0));
+        if (destination == null) {
+            warnOnce("seed-no-colortex0", Diagnostic.warning("colortex0", 0,
+                    "seed input provided but colortex0 is not allocated; seed skipped"));
+            return;
+        }
+        if (!sizeMatches(seedInput, destination, viewportWidth, viewportHeight)) {
+            warnOnce("seed-size", Diagnostic.warning("colortex0", 0,
+                    "seed input size does not match colortex0; seed skipped"));
+            return;
+        }
+        encoder.copyTextureToTexture(seedInput, destination, 0, 0, 0, 0, 0,
+                viewportWidth, viewportHeight);
+    }
+
+    /** 呈现拷贝：colortex0 最终副本 → MC 主目标。 */
+    private void presentTo(CommandEncoder encoder,
+                           com.mojang.blaze3d.textures.GpuTexture presentOutput,
+                           int viewportWidth, int viewportHeight) {
+        if (presentOutput == null) {
+            return;
+        }
+        LuminTargetId color0 = LuminTargetId.color(0);
+        var source = targets.texture(color0, finalColorCopy(compiled.framePlan(), color0));
+        if (source == null) {
+            warnOnce("present-no-colortex0", Diagnostic.warning("colortex0", 0,
+                    "present output requested but colortex0 is not allocated; present skipped"));
+            return;
+        }
+        if (!sizeMatches(source, presentOutput, viewportWidth, viewportHeight)) {
+            warnOnce("present-size", Diagnostic.warning("colortex0", 0,
+                    "colortex0 size does not match present output; present skipped"));
+            return;
+        }
+        encoder.copyTextureToTexture(source, presentOutput, 0, 0, 0, 0, 0,
+                viewportWidth, viewportHeight);
+    }
+
+    /** 乒乓初值：清屏后两副本一致，读绑定从 MAIN 起（与帧规划器一致）。 */
+    static LuminResourceId.Copy resolveInitialCopy(LuminTargetId target) {
+        return LuminResourceId.Copy.MAIN;
+    }
+
+    /**
+     * colortex0 的最终副本 = 最后一次写它的 pass 的写副本；从未写过则 MAIN。
+     */
+    static LuminResourceId.Copy finalColorCopy(LuminFramePlan plan, LuminTargetId target) {
+        LuminResourceId.Copy copy = LuminResourceId.Copy.MAIN;
+        for (LuminFramePlan.PassStep pass : plan.passSteps()) {
+            LuminResourceId.Copy write = pass.writes().get(target);
+            if (write != null) {
+                copy = write;
+            }
+        }
+        return copy;
+    }
+
+    static boolean sizeMatches(com.mojang.blaze3d.textures.GpuTexture a,
+                               com.mojang.blaze3d.textures.GpuTexture b,
+                               int width, int height) {
+        return a.getWidth(0) == width && a.getHeight(0) == height
+                && b.getWidth(0) == width && b.getHeight(0) == height;
     }
 
     private void ensureTargets(GpuDevice device, int viewportWidth, int viewportHeight) {
@@ -201,13 +294,19 @@ public final class ShaderpackFrameExecutor implements AutoCloseable {
             if (needsUniforms) {
                 renderPass.setUniform(LuminShaderpackUniformBlock.BLOCK_NAME, uniformBuffer);
             }
+            // 只绑管线声明的采样器（未声明的绑定同样会使管线编译/绑定失败）
+            Set<String> declaredSamplers = new java.util.HashSet<>(pipeline.getSamplers());
             for (var read : pass.reads().entrySet()) {
+                String samplerName = read.getKey().canonicalName();
+                if (!declaredSamplers.contains(samplerName)) {
+                    continue;
+                }
                 GpuTextureView view = targets.view(read.getKey(), read.getValue());
                 if (view != null) {
-                    renderPass.bindTexture(read.getKey().canonicalName(), view, sampler);
+                    renderPass.bindTexture(samplerName, view, sampler);
                 }
             }
-            renderPass.draw(3, 1);
+            renderPass.draw(FULLSCREEN_FIRST_VERTEX, FULLSCREEN_VERTEX_COUNT);
         }
     }
 

@@ -18,6 +18,13 @@ public final class LuminShaderpackUniformBlock {
     /** GLSL 块名（翻译层映射与管线声明共用）。 */
     public static final String BLOCK_NAME = "ShaderpackUniforms";
 
+    /**
+     * GLSL 实例名：成员经 {@code shaderpackUniforms.<Member>} 访问。
+     * <p>GLSL 无实例名的 uniform 块成员只能以**裸名**访问；实例名隔离了成员名，
+     * 避免与包内变量/函数重名冲突。</p>
+     */
+    public static final String INSTANCE_NAME = "shaderpackUniforms";
+
     /** 成员表（顺序即 GLSL 声明顺序，偏移由 std140 推导）。 */
     public static final List<LuminUniformField> FIELDS = List.of(
             new LuminUniformField("SunPosition", LuminUniformField.Type.VEC4),
@@ -56,7 +63,7 @@ public final class LuminShaderpackUniformBlock {
 
     /** GLSL 块声明文本（供翻译层注入）。 */
     public static String glslDeclaration() {
-        return LAYOUT.glslDeclaration(BLOCK_NAME);
+        return LAYOUT.glslDeclaration(BLOCK_NAME, INSTANCE_NAME);
     }
 
     /**

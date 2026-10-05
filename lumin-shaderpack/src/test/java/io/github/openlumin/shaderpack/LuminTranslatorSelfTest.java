@@ -258,11 +258,11 @@ public final class LuminTranslatorSelfTest {
                 source, LuminShaderKind.FRAGMENT, 1);
         String out = result.source();
         check(out.contains("uniform ShaderpackUniforms"), "block declaration injected");
-        check(out.contains("#define sunPosition ShaderpackUniforms.SunPosition.xyz"),
+        check(out.contains("#define sunPosition shaderpackUniforms.SunPosition.xyz"),
                 "sunPosition maps to block member");
-        check(out.contains("#define rainStrength ShaderpackUniforms.RainStrength"),
+        check(out.contains("#define rainStrength shaderpackUniforms.RainStrength"),
                 "rainStrength maps to block member");
-        check(out.contains("#define worldTime ShaderpackUniforms.WorldTime"),
+        check(out.contains("#define worldTime shaderpackUniforms.WorldTime"),
                 "worldTime maps to block member");
         check(!out.contains("uniform vec3 sunPosition;"),
                 "mapped uniform declaration must be removed");

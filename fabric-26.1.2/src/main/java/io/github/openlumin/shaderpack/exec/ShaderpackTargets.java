@@ -28,6 +28,16 @@ import java.util.Map;
  */
 public final class ShaderpackTargets implements AutoCloseable {
 
+    /**
+     * 目标纹理 usage（与 vanilla RenderTarget 的 15 一致，java 实证）：
+     * COPY_DST（clearColorTexture/copy 目标所需——运行时实测强制）+ COPY_SRC（present 拷贝源）
+     * + TEXTURE_BINDING（采样）+ RENDER_ATTACHMENT（pass 颜色附件）。
+     */
+    public static final int TARGET_USAGE = GpuTexture.USAGE_COPY_DST
+            | GpuTexture.USAGE_COPY_SRC
+            | GpuTexture.USAGE_TEXTURE_BINDING
+            | GpuTexture.USAGE_RENDER_ATTACHMENT;
+
     private final Map<LuminResourceId, GpuTexture> textures = new LinkedHashMap<>();
     private final Map<LuminResourceId, GpuTextureView> views = new LinkedHashMap<>();
     private final List<Diagnostic> diagnostics = new ArrayList<>();
@@ -62,7 +72,7 @@ public final class ShaderpackTargets implements AutoCloseable {
         int targetWidth = Math.max(1, allocation.size().resolveWidth(baseWidth));
         int targetHeight = Math.max(1, allocation.size().resolveHeight(baseHeight));
         TextureFormat format = mapTextureFormat(target, allocation.format(), diagnostics);
-        int usage = GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_TEXTURE_BINDING;
+        int usage = TARGET_USAGE;
         if (allocation.mipmap()) {
             diagnostics.add(Diagnostic.warning(target.canonicalName(), 0,
                     "mipmap requested but generation is not wired yet; allocating 1 level"));

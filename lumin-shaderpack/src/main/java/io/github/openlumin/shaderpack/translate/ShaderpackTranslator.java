@@ -75,41 +75,41 @@ public final class ShaderpackTranslator {
         registerMapping("cameraPosition", "(vec3(CameraBlockPos) + CameraOffset)", "Globals");
         registerMapping("fogColor", "FogColor.rgb", "Fog");
         registerMapping("sunPosition",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".SunPosition.xyz", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".SunPosition.xyz", "ShaderpackUniforms");
         registerMapping("moonPosition",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".MoonPosition.xyz", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".MoonPosition.xyz", "ShaderpackUniforms");
         registerMapping("shadowLightPosition",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".ShadowLightPosition.xyz",
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".ShadowLightPosition.xyz",
                 "ShaderpackUniforms");
         registerMapping("upPosition",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".UpPosition.xyz", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".UpPosition.xyz", "ShaderpackUniforms");
         registerMapping("eyePosition",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".EyePosition.xyz", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".EyePosition.xyz", "ShaderpackUniforms");
         registerMapping("worldTime",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".WorldTime", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".WorldTime", "ShaderpackUniforms");
         registerMapping("worldDay",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".WorldDay", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".WorldDay", "ShaderpackUniforms");
         registerMapping("frameCounter",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".FrameCounter", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".FrameCounter", "ShaderpackUniforms");
         registerMapping("frameTime",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".FrameTime", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".FrameTime", "ShaderpackUniforms");
         registerMapping("frameTimeCounter",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".FrameTimeCounter", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".FrameTimeCounter", "ShaderpackUniforms");
         registerMapping("rainStrength",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".RainStrength", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".RainStrength", "ShaderpackUniforms");
         registerMapping("wetness",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".Wetness", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".Wetness", "ShaderpackUniforms");
         registerMapping("eyeAltitude",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".EyeAltitude", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".EyeAltitude", "ShaderpackUniforms");
         registerMapping("isEyeInWater",
-                "int(" + LuminShaderpackUniformBlock.BLOCK_NAME + ".IsEyeInWater)",
+                "int(" + LuminShaderpackUniformBlock.INSTANCE_NAME + ".IsEyeInWater)",
                 "ShaderpackUniforms");
         registerMapping("nightVision",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".NightVision", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".NightVision", "ShaderpackUniforms");
         registerMapping("blindness",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".Blindness", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".Blindness", "ShaderpackUniforms");
         registerMapping("darknessFactor",
-                LuminShaderpackUniformBlock.BLOCK_NAME + ".DarknessFactor", "ShaderpackUniforms");
+                LuminShaderpackUniformBlock.INSTANCE_NAME + ".DarknessFactor", "ShaderpackUniforms");
     }
 
     private static void registerMapping(String name, String replacement, String... blocks) {

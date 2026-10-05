@@ -56,13 +56,25 @@ public final class LuminUniformLayout {
 
     /** GLSL 块声明文本（{@code layout(std140) uniform <blockName> { ... };}）。 */
     public String glslDeclaration(String blockName) {
+        return glslDeclaration(blockName, null);
+    }
+
+    /**
+     * GLSL 块声明文本；{@code instanceName} 非空时生成实例名
+     * （成员经 {@code instanceName.member} 访问——无实例名时成员只能裸名访问）。
+     */
+    public String glslDeclaration(String blockName, String instanceName) {
         StringBuilder out = new StringBuilder();
         out.append("layout(std140) uniform ").append(blockName).append(" {\n");
         for (LuminUniformField field : fields) {
             out.append("    ").append(field.type().glsl())
                     .append(' ').append(field.name()).append(";\n");
         }
-        out.append("};\n");
+        out.append('}');
+        if (instanceName != null && !instanceName.isEmpty()) {
+            out.append(' ').append(instanceName);
+        }
+        out.append(";\n");
         return out.toString();
     }
 

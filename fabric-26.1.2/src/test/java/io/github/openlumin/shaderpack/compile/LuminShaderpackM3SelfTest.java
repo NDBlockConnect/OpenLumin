@@ -47,6 +47,7 @@ public final class LuminShaderpackM3SelfTest {
         section("resource/frame plan wired", LuminShaderpackM3SelfTest::testPlansWired);
         section("translation wired", LuminShaderpackM3SelfTest::testTranslationWired);
         section("uniform block wired", LuminShaderpackM3SelfTest::testUniformBlockWired);
+        section("sampler declarations from source", LuminShaderpackM3SelfTest::testSamplerExtraction);
         section("error pack refused", LuminShaderpackM3SelfTest::testErrorRefused);
         if (failures > 0) {
             System.err.println("[lumin-shaderpack M3] " + failures + " section(s) FAILED");
@@ -330,7 +331,7 @@ public final class LuminShaderpackM3SelfTest {
         String deployed = compiled.shaderResources().get("shaders/shaderpack/composite1.fsh");
         check(deployed != null && deployed.contains("uniform ShaderpackUniforms"),
                 "ShaderpackUniforms block must be injected into the deployed source");
-        check(deployed.contains("#define sunPosition ShaderpackUniforms.SunPosition.xyz"),
+        check(deployed.contains("#define sunPosition shaderpackUniforms.SunPosition.xyz"),
                 "sunPosition macro must target the block member");
 
         LuminProgramId composite1 = LuminProgramId.numbered(LuminProgramGroup.COMPOSITE, 1);
@@ -339,5 +340,25 @@ public final class LuminShaderpackM3SelfTest {
         check(pipeline.getUniforms().stream()
                         .anyMatch(u -> u.name().equals("ShaderpackUniforms")),
                 "pipeline must declare ShaderpackUniforms when the shader uses it");
+    }
+
+    /** 采样器声明取自翻译后源码：图推断但源码未声明的（如 depthtex0）不得声明。 */
+    private static void testSamplerExtraction() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("shaders/composite1.fsh", """
+                #version 120
+                uniform sampler2D colortex0;
+                void main() {
+                    gl_FragColor = texture2D(colortex0, vec2(0.0));
+                }
+                """);
+        CompiledShaderpack compiled = compile(files);
+        LuminProgramId composite1 = LuminProgramId.numbered(LuminProgramGroup.COMPOSITE, 1);
+        RenderPipeline pipeline = compiled.pipelineFor(composite1);
+        check(pipeline != null, "composite pipeline must exist");
+        check(pipeline.getSamplers().contains("colortex0"),
+                "sampler declared in source must be declared on the pipeline");
+        check(!pipeline.getSamplers().contains("depthtex0"),
+                "graph-inferred but undeclared sampler must not be declared");
     }
 }

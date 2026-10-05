@@ -34,9 +34,13 @@ import net.minecraft.resources.Identifier;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * WP-2 M3 编译器（26.1.2 GL 平台层）：{@link ShaderpackIR} + {@link PassGraph}
@@ -82,12 +86,13 @@ public final class LuminShaderpackCompiler {
             #version 330
 
             // 引擎内建全屏三角形：顶点 0..2 覆盖屏幕（标准 gl_VertexID 映射）。
-            out vec2 texCoord;
+            // 输出 varying 沿用 OptiFine 合成约定 `texcoord`（包 fsh 以该名声明 input）。
+            out vec2 texcoord;
 
             void main() {
                 vec2 uv = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
                 gl_Position = vec4(uv * 2.0 - 1.0, 0.0, 1.0);
-                texCoord = uv;
+                texcoord = uv;
             }
             """;
 
@@ -163,8 +168,9 @@ public final class LuminShaderpackCompiler {
                 boolean usesUniformBlock = programResources.values().stream()
                         .anyMatch(text -> text.contains(
                                 "uniform " + LuminShaderpackUniformBlock.BLOCK_NAME));
+                Set<String> samplers = extractSamplers(programResources.values());
                 buildCompositePipeline(ir, program, source, node, pipelines, diagnostics,
-                        usesUniformBlock);
+                        usesUniformBlock, samplers);
                 shaderResources.putAll(programResources);
                 if (!source.has(LuminShaderKind.VERTEX)) {
                     shaderResources.putIfAbsent(FULLSCREEN_VERTEX_RESOURCE, FULLSCREEN_VERTEX_SOURCE);
@@ -205,7 +211,8 @@ public final class LuminShaderpackCompiler {
                                                LuminPassNode node,
                                                Map<LuminProgramId, RenderPipeline> out,
                                                List<Diagnostic> diagnostics,
-                                               boolean usesShaderpackUniforms) {
+                                               boolean usesShaderpackUniforms,
+                                               Set<String> samplers) {
         boolean hasVertex = source.has(LuminShaderKind.VERTEX);
         if (hasVertex) {
             diagnostics.add(Diagnostic.info(source.id().sourceBaseName(), 0,
@@ -228,10 +235,26 @@ public final class LuminShaderpackCompiler {
         }
 
         applyBlend(ir, program, builder, diagnostics);
-        for (LuminResourceId resource : node.reads()) {
-            builder.withSampler(resource.target().canonicalName());
+        // 采样器声明以**翻译后源码实际声明**为准（图读取集仅用于排序/生命周期）：
+        // 声明未使用的采样器会使 MC 管线编译失败。
+        for (String samplerName : samplers) {
+            builder.withSampler(samplerName);
         }
         out.put(program, builder.build());
+    }
+
+    /** 从（翻译后）源文本提取 `uniform sampler* <name>;` 声明名（保序）。 */
+    static Set<String> extractSamplers(java.util.Collection<String> sources) {
+        Pattern pattern = Pattern.compile(
+                "(?m)^\\s*uniform\\s+(?:(?:lowp|mediump|highp)\\s+)?sampler\\w*\\s+(\\w+)\\s*;");
+        Set<String> names = new LinkedHashSet<>();
+        for (String source : sources) {
+            Matcher matcher = pattern.matcher(source);
+            while (matcher.find()) {
+                names.add(matcher.group(1));
+            }
+        }
+        return names;
     }
 
     /**

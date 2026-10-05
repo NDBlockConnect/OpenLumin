@@ -123,6 +123,8 @@ public final class LuminUniformBlockSelfTest {
         String glsl = LuminShaderpackUniformBlock.glslDeclaration();
         check(glsl.startsWith("layout(std140) uniform ShaderpackUniforms {"),
                 "declaration header");
+        check(glsl.contains("} shaderpackUniforms;"),
+                "instance name present (members are accessed via instance)");
         check(glsl.contains("vec4 SunPosition;"), "vec4 member rendered");
         check(glsl.contains("float SunAngle;"), "float member rendered");
         check(glsl.contains("int FrameCounter;"), "int member rendered");
