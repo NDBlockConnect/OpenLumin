@@ -44,9 +44,9 @@ jar {
 
 tasks.register('selfTest', JavaExec) {
     group = 'verification'
-    description = 'Runs the WP-2 M3 shaderpack compiler self test (no game launch required).'
+    description = 'Runs the WP-2 M3 compiler + M4 executor self tests (no game launch required).'
     classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'io.github.openlumin.shaderpack.compile.LuminShaderpackM3SelfTest'
+    mainClass = 'io.github.openlumin.shaderpack.exec.ShaderpackExecSelfTest'
     maxHeapSize = '256m'
     jvmArgs '-XX:+UseSerialGC'
 }
