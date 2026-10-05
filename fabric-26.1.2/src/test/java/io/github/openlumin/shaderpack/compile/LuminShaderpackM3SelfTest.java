@@ -38,6 +38,8 @@ public final class LuminShaderpackM3SelfTest {
         section("blend override int mapping", LuminShaderpackM3SelfTest::testBlendOverride);
         section("blend code mapping table", LuminShaderpackM3SelfTest::testBlendCodes);
         section("shader resource deployment", LuminShaderpackM3SelfTest::testResourceDeployment);
+        section("fullscreen vertex fallback", LuminShaderpackM3SelfTest::testFullscreenFallback);
+        section("compute pass deferred", LuminShaderpackM3SelfTest::testComputeDeferred);
         section("geometry pass deferred", LuminShaderpackM3SelfTest::testGeometryDeferred);
         section("error pack refused", LuminShaderpackM3SelfTest::testErrorRefused);
         if (failures > 0) {
@@ -100,10 +102,10 @@ public final class LuminShaderpackM3SelfTest {
         LuminProgramId finalId = LuminProgramId.of(LuminProgramGroup.FINAL, "final");
         RenderPipeline pipeline = compiled.pipelineFor(finalId);
         check(pipeline != null, "final pass must be compiled");
-        check(pipeline.getVertexFormat() == DefaultVertexFormat.POSITION_TEX,
-                "composite passes use POSITION_TEX fullscreen quads");
-        check(pipeline.getVertexFormatMode() == VertexFormat.Mode.QUADS,
-                "composite passes use quad topology");
+        check(pipeline.getVertexFormat() == DefaultVertexFormat.EMPTY,
+                "composite passes use the engine gl_VertexID convention (EMPTY format)");
+        check(pipeline.getVertexFormatMode() == VertexFormat.Mode.TRIANGLES,
+                "composite passes use fullscreen-triangle topology");
         check(!pipeline.isCull(), "composite passes must not cull");
         check(pipeline.getVertexShader().getNamespace().equals("openlumin"),
                 "shader namespace must be openlumin");
@@ -140,16 +142,49 @@ public final class LuminShaderpackM3SelfTest {
 
     private static void testResourceDeployment() {
         CompiledShaderpack compiled = compile(pack());
-        check(compiled.shaderResources().containsKey("shaders/composite1.vsh"),
+        check(compiled.shaderResources().containsKey("shaders/shaderpack/composite1.vsh"),
                 "composite1 vertex source must be deployed");
-        check(compiled.shaderResources().containsKey("shaders/composite1.fsh"),
+        check(compiled.shaderResources().containsKey("shaders/shaderpack/composite1.fsh"),
                 "composite1 fragment source must be deployed");
-        check(compiled.shaderResources().containsKey("shaders/final.vsh"),
+        check(compiled.shaderResources().containsKey("shaders/shaderpack/final.vsh"),
                 "final vertex source must be deployed");
-        check(compiled.shaderResources().containsKey("shaders/final.fsh"),
+        check(compiled.shaderResources().containsKey("shaders/shaderpack/final.fsh"),
                 "final fragment source must be deployed");
-        check(!compiled.shaderResources().containsKey("shaders/gbuffers_terrain.vsh"),
+        check(!compiled.shaderResources().containsKey("shaders/shaderpack/gbuffers_terrain.vsh"),
                 "geometry pass sources must not be deployed in M3");
+    }
+
+    /** 真实 shaderpack 的合成 pass 常只有 .fsh：必须回退到内建全屏顶点着色器并部署它。 */
+    private static void testFullscreenFallback() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("shaders/composite1.fsh", "/* DRAWBUFFERS:0 */\nvoid main(){}\n");
+        CompiledShaderpack compiled = compile(files);
+        LuminProgramId composite1 = LuminProgramId.numbered(LuminProgramGroup.COMPOSITE, 1);
+        RenderPipeline pipeline = compiled.pipelineFor(composite1);
+        check(pipeline != null, "fragment-only composite must still compile");
+        check(pipeline.getVertexShader().toString().endsWith("shaderpack/_fullscreen"),
+                "fragment-only composite must bind the built-in fullscreen vertex shader, got "
+                        + pipeline.getVertexShader());
+        check(compiled.shaderResources().containsKey("shaders/shaderpack/_fullscreen.vsh"),
+                "built-in fullscreen vertex source must be deployed");
+        check(!compiled.shaderResources().containsKey("shaders/shaderpack/composite1.vsh"),
+                "no pack vertex source should be deployed when absent");
+    }
+
+    /** 仅有 .csh 的 compute 程序：26.1.2 GL 无计算管线，应延后并记录 INFO。 */
+    private static void testComputeDeferred() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("shaders/setup.csh", "#version 430\nlayout(local_size_x=1) in;\nvoid main(){}\n");
+        CompiledShaderpack compiled = compile(files);
+        LuminProgramId setup = LuminProgramId.of(LuminProgramGroup.SETUP, "setup");
+        check(compiled.pipelineFor(setup) == null,
+                "compute-only pass must not produce a graphics pipeline");
+        check(!compiled.executionOrder().contains(setup),
+                "deferred compute pass must not enter the M3 execution order");
+        check(compiled.diagnostics().stream().anyMatch(
+                        d -> d.severity() == Diagnostic.Severity.INFO
+                                && d.message().contains("compute pass")),
+                "compute deferral must be recorded as INFO");
     }
 
     private static void testGeometryDeferred() {

@@ -31,15 +31,42 @@ import java.util.Optional;
  * → 逐程序 {@link RenderPipeline} 与着色器资源部署表。
  *
  * <p>M3 首片覆盖<b>合成族 pass</b>（SETUP/BEGIN/DEFERRED/COMPOSITE/FINAL/PREPARE/SHADOWCOMP）：
- * 全屏四边形、POSITION_TEX 顶点格式、无深度测试、按指令或默认关闭混合。</p>
+ * 全屏三角形（引擎控制，{@code gl_VertexID} 约定，与 26.1.2 内建
+ * {@code minecraft:core/screenquad} 同构）、无深度测试、按指令或默认关闭混合。</p>
  * <p>几何 pass（GBUFFERS/SHADOW）的管线替换依赖 WP-1 区块引擎接线（设计 §7，M7 集成），
  * 编译层此期仅记录 INFO 诊断，不生成管线。</p>
+ * <p>compute 程序（仅有 .csh 的 SETUP/SHADOWCOMP 等）在 26.1.2 GL 路径无计算管线抽象
+ * （已 javap 实证：pipeline 包无 ComputePipeline），此期记录 INFO 诊断并延后。</p>
  * <p>管线对象为数据构建（{@code RenderPipeline.builder().build()} 不触发 GPU 编译），
  * 因此可在无游戏环境下全量自测。</p>
  */
 public final class LuminShaderpackCompiler {
 
     private static final String NAMESPACE = "openlumin";
+    private static final String SHADER_BASE = "shaderpack/";
+
+    /**
+     * 内建全屏顶点着色器（合成 pass 缺 vsh 时的回退）。
+     * <p>与 26.1.2 内建 {@code minecraft:core/screenquad} 同构：{@code gl_VertexID}
+     * 全屏三角形，无顶点属性（EMPTY 格式 + TRIANGLES）。</p>
+     */
+    private static final String FULLSCREEN_SHADER_NAME = "_fullscreen";
+    private static final Identifier FULLSCREEN_VERTEX_SHADER =
+            Identifier.fromNamespaceAndPath(NAMESPACE, SHADER_BASE + FULLSCREEN_SHADER_NAME);
+    private static final String FULLSCREEN_VERTEX_RESOURCE =
+            "shaders/" + SHADER_BASE + FULLSCREEN_SHADER_NAME + ".vsh";
+    private static final String FULLSCREEN_VERTEX_SOURCE = """
+            #version 330
+
+            // 引擎内建全屏三角形：顶点 0..2 覆盖屏幕（标准 gl_VertexID 映射）。
+            out vec2 texCoord;
+
+            void main() {
+                vec2 uv = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+                gl_Position = vec4(uv * 2.0 - 1.0, 0.0, 1.0);
+                texCoord = uv;
+            }
+            """;
 
     private LuminShaderpackCompiler() {
     }
@@ -79,8 +106,23 @@ public final class LuminShaderpackCompiler {
                 continue;
             }
             if (isCompositeFamily(program.group())) {
-                diagnostics.addAll(buildCompositePipeline(ir, program, source, node, pipelines));
+                if (isComputeOnly(source)) {
+                    diagnostics.add(Diagnostic.info(source.id().sourceBaseName(), 0,
+                            "compute pass '" + program.sourceBaseName()
+                                    + "' not compiled in M3 (no compute pipeline on 26.1.2 GL path)"));
+                    continue;
+                }
+                if (!source.has(LuminShaderKind.FRAGMENT)) {
+                    diagnostics.add(Diagnostic.warning(source.id().sourceBaseName(), 0,
+                            "composite pass '" + program.sourceBaseName()
+                                    + "' has no fragment stage; skipped"));
+                    continue;
+                }
+                buildCompositePipeline(ir, program, source, node, pipelines, diagnostics);
                 collectShaderResources(source, shaderResources);
+                if (!source.has(LuminShaderKind.VERTEX)) {
+                    shaderResources.putIfAbsent(FULLSCREEN_VERTEX_RESOURCE, FULLSCREEN_VERTEX_SOURCE);
+                }
                 executionOrder.add(program);
             } else {
                 diagnostics.add(Diagnostic.info(
@@ -101,16 +143,29 @@ public final class LuminShaderpackCompiler {
         };
     }
 
-    private static List<Diagnostic> buildCompositePipeline(ShaderpackIR ir,
-                                                           LuminProgramId program,
-                                                           LuminProgramSource source,
-                                                           LuminPassNode node,
-                                                           Map<LuminProgramId, RenderPipeline> out) {
-        List<Diagnostic> diagnostics = new ArrayList<>();
+    /** 仅含计算阶段（无 vsh/fsh）：26.1.2 GL 路径延后。 */
+    static boolean isComputeOnly(LuminProgramSource source) {
+        return source.has(LuminShaderKind.COMPUTE)
+                && !source.has(LuminShaderKind.VERTEX)
+                && !source.has(LuminShaderKind.FRAGMENT);
+    }
+
+    private static void buildCompositePipeline(ShaderpackIR ir,
+                                               LuminProgramId program,
+                                               LuminProgramSource source,
+                                               LuminPassNode node,
+                                               Map<LuminProgramId, RenderPipeline> out,
+                                               List<Diagnostic> diagnostics) {
+        boolean hasVertex = source.has(LuminShaderKind.VERTEX);
+        if (hasVertex) {
+            diagnostics.add(Diagnostic.info(source.id().sourceBaseName(), 0,
+                    "custom composite vertex shader wired; OptiFine-style attribute/uniform"
+                            + " translation is not applied yet (engine gl_VertexID convention)"));
+        }
         RenderPipeline.Builder builder = RenderPipeline.builder()
                 .withLocation(pipelineLocation(program))
-                .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
-                .withVertexShader(shaderLocation(program))
+                .withVertexFormat(DefaultVertexFormat.EMPTY, VertexFormat.Mode.TRIANGLES)
+                .withVertexShader(hasVertex ? shaderLocation(program) : FULLSCREEN_VERTEX_SHADER)
                 .withFragmentShader(shaderLocation(program))
                 .withCull(false)
                 .withDepthStencilState(Optional.empty());
@@ -120,7 +175,6 @@ public final class LuminShaderpackCompiler {
             builder.withSampler(resource.target().canonicalName());
         }
         out.put(program, builder.build());
-        return diagnostics;
     }
 
     /**
@@ -197,18 +251,18 @@ public final class LuminShaderpackCompiler {
         for (LuminShaderKind kind : EnumSet.of(LuminShaderKind.VERTEX, LuminShaderKind.FRAGMENT)) {
             String text = source.source(kind);
             if (text != null && !text.isEmpty()) {
-                out.put("shaders/" + base + "." + kind.extension(), text);
+                out.put("shaders/" + SHADER_BASE + base + "." + kind.extension(), text);
             }
         }
     }
 
     private static Identifier pipelineLocation(LuminProgramId program) {
         return Identifier.fromNamespaceAndPath(
-                NAMESPACE, "shaderpack/" + program.sourceBaseName() + "/pipeline");
+                NAMESPACE, SHADER_BASE + program.sourceBaseName() + "/pipeline");
     }
 
     private static Identifier shaderLocation(LuminProgramId program) {
         return Identifier.fromNamespaceAndPath(
-                NAMESPACE, "shaderpack/" + program.sourceBaseName());
+                NAMESPACE, SHADER_BASE + program.sourceBaseName());
     }
 }
