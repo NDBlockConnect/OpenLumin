@@ -38,6 +38,7 @@ public final class LuminShaderpackM3SelfTest {
         section("blend override int mapping", LuminShaderpackM3SelfTest::testBlendOverride);
         section("blend code mapping table", LuminShaderpackM3SelfTest::testBlendCodes);
         section("shader resource deployment", LuminShaderpackM3SelfTest::testResourceDeployment);
+        section("deployment is preprocessed", LuminShaderpackM3SelfTest::testDeploymentPreprocessed);
         section("fullscreen vertex fallback", LuminShaderpackM3SelfTest::testFullscreenFallback);
         section("compute pass deferred", LuminShaderpackM3SelfTest::testComputeDeferred);
         section("geometry pass deferred", LuminShaderpackM3SelfTest::testGeometryDeferred);
@@ -171,6 +172,22 @@ public final class LuminShaderpackM3SelfTest {
                 "built-in fullscreen vertex source must be deployed");
         check(!compiled.shaderResources().containsKey("shaders/shaderpack/composite1.vsh"),
                 "no pack vertex source should be deployed when absent");
+    }
+
+    /** 部署的源必须是预处理后的：include 展开、#version 顶部回填。 */
+    private static void testDeploymentPreprocessed() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("shaders/composite1.fsh",
+                "#include \"include/util.glsl\"\n/* DRAWBUFFERS:0 */\nvoid main(){}\n");
+        files.put("shaders/include/util.glsl", "#version 330\nfloat utilValue = 1.0;\n");
+        CompiledShaderpack compiled = compile(files);
+        String deployed = compiled.shaderResources().get("shaders/shaderpack/composite1.fsh");
+        check(deployed != null, "composite1 fragment source must be deployed");
+        check(!deployed.contains("#include"), "includes must be expanded before deployment");
+        check(deployed.contains("float utilValue = 1.0;"),
+                "included content must be inlined into the deployed source");
+        check(deployed.startsWith("#version 330"),
+                "#version must be hoisted to the top of the deployed source");
     }
 
     /** 仅有 .csh 的 compute 程序：26.1.2 GL 无计算管线，应延后并记录 INFO。 */

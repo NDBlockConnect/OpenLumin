@@ -21,6 +21,7 @@ import io.github.openlumin.shaderpack.capability.LuminCapabilitySet;
 import io.github.openlumin.shaderpack.graph.LuminPassNode;
 import io.github.openlumin.shaderpack.graph.LuminResourceId;
 import io.github.openlumin.shaderpack.graph.PassGraph;
+import io.github.openlumin.shaderpack.parse.ShaderpackPreprocessor;
 import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
@@ -147,7 +148,7 @@ public final class LuminShaderpackCompiler {
                     continue;
                 }
                 buildCompositePipeline(ir, program, source, node, pipelines, diagnostics);
-                collectShaderResources(source, shaderResources);
+                collectShaderResources(ir, source, shaderResources, diagnostics);
                 if (!source.has(LuminShaderKind.VERTEX)) {
                     shaderResources.putIfAbsent(FULLSCREEN_VERTEX_RESOURCE, FULLSCREEN_VERTEX_SOURCE);
                 }
@@ -273,12 +274,24 @@ public final class LuminShaderpackCompiler {
         };
     }
 
-    private static void collectShaderResources(LuminProgramSource source,
-                                               Map<String, String> out) {
+    /**
+     * 部署着色器资源：源文本先经预处理（include 展开 + #version/#extension 顶部回填），
+     * 部署键与 {@code Identifier("openlumin","shaderpack/<base>")} 的资源解析路径一致。
+     */
+    private static void collectShaderResources(ShaderpackIR ir, LuminProgramSource source,
+                                               Map<String, String> out,
+                                               List<Diagnostic> diagnostics) {
         String base = source.id().sourceBaseName();
         for (LuminShaderKind kind : EnumSet.of(LuminShaderKind.VERTEX, LuminShaderKind.FRAGMENT)) {
             String text = source.source(kind);
             if (text != null && !text.isEmpty()) {
+                String path = source.path(kind);
+                if (path != null && ir.includeGraph() != null) {
+                    ShaderpackPreprocessor.Result preprocessed = ShaderpackPreprocessor.preprocess(
+                            ir.includeGraph(), path, Map.of());
+                    diagnostics.addAll(preprocessed.diagnostics());
+                    text = preprocessed.source();
+                }
                 out.put("shaders/" + SHADER_BASE + base + "." + kind.extension(), text);
             }
         }

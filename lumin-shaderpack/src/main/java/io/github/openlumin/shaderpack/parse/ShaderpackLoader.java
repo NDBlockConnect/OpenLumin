@@ -139,6 +139,7 @@ public final class ShaderpackLoader {
             }
             MutableProgram program = programs.computeIfAbsent(id, MutableProgram::new);
             program.sources.put(kind, source);
+            program.paths.put(kind, path);
             // 源代码级指令：DRAWBUFFERS/RENDERTARGETS + colortex 格式/清屏等
             DirectiveParser.ParsedDirectives parsed = DirectiveParser.parse(source);
             if (parsed.hasDrawBuffersDirective()) {
@@ -165,7 +166,7 @@ public final class ShaderpackLoader {
         ShaderpackIR.PackMetadata metadata = new ShaderpackIR.PackMetadata(
                 packName, "<provided>", dimensions, hasSources);
         return new ShaderpackIR(metadata, programSources, directives, targets,
-                customUniforms, required, optional, diagnostics);
+                customUniforms, required, optional, includeGraph, diagnostics);
     }
 
     /** 是否形如 {@code <name>.<kind>}。 */
@@ -584,6 +585,7 @@ public final class ShaderpackLoader {
     private static final class MutableProgram {
         private final LuminProgramId id;
         private final Map<LuminShaderKind, String> sources = new EnumMap<>(LuminShaderKind.class);
+        private final Map<LuminShaderKind, String> paths = new EnumMap<>(LuminShaderKind.class);
         private Set<LuminTargetId> drawTargets = Set.of(LuminTargetId.color(0));
 
         MutableProgram(LuminProgramId id) {
@@ -591,7 +593,7 @@ public final class ShaderpackLoader {
         }
 
         LuminProgramSource toImmutable() {
-            return new LuminProgramSource(id, sources, drawTargets, true);
+            return new LuminProgramSource(id, sources, paths, drawTargets, true);
         }
     }
 }

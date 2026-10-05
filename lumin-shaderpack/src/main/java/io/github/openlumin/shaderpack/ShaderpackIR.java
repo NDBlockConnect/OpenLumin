@@ -17,6 +17,7 @@ import java.util.Set;
  * @param customUniforms  自定义 uniform/变量声明
  * @param requiredFeatures 必需能力旗标（不满足则拒绝该 pack）
  * @param optionalFeatures 可选能力旗标（不满足则以 false 提供给包）
+ * @param includeGraph     include 依赖图（编译期源码展开用；持有 SourceProvider 以便后续再读）
  * @param diagnostics     解析期诊断（含位置；含 ERROR 即视为不可用）
  */
 public record ShaderpackIR(
@@ -27,6 +28,7 @@ public record ShaderpackIR(
         List<LuminCustomUniform> customUniforms,
         Set<LuminFeatureFlag> requiredFeatures,
         Set<LuminFeatureFlag> optionalFeatures,
+        io.github.openlumin.shaderpack.parse.IncludeGraph includeGraph,
         List<Diagnostic> diagnostics) {
 
     /**

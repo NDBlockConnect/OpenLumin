@@ -15,13 +15,21 @@ public final class LuminProgramSource {
 
     private final LuminProgramId id;
     private final Map<LuminShaderKind, String> sources;
+    private final Map<LuminShaderKind, String> paths;
     private final java.util.Set<LuminTargetId> drawTargets;
     private final boolean enabled;
 
     public LuminProgramSource(LuminProgramId id, Map<LuminShaderKind, String> sources,
                               java.util.Set<LuminTargetId> drawTargets, boolean enabled) {
+        this(id, sources, Map.of(), drawTargets, enabled);
+    }
+
+    public LuminProgramSource(LuminProgramId id, Map<LuminShaderKind, String> sources,
+                              Map<LuminShaderKind, String> paths,
+                              java.util.Set<LuminTargetId> drawTargets, boolean enabled) {
         this.id = Objects.requireNonNull(id, "id");
         this.sources = Collections.unmodifiableMap(new EnumMap<>(sources));
+        this.paths = Collections.unmodifiableMap(new EnumMap<>(paths));
         this.drawTargets = java.util.Set.copyOf(drawTargets);
         this.enabled = enabled;
     }
@@ -43,6 +51,16 @@ public final class LuminProgramSource {
         return sources.containsKey(kind);
     }
 
+    /** 阶段 → 源文件规范化路径（编译期 include 展开用；未记录时缺省）。 */
+    public Map<LuminShaderKind, String> paths() {
+        return paths;
+    }
+
+    /** 某阶段的源文件路径；未记录返回 null。 */
+    public String path(LuminShaderKind kind) {
+        return paths.get(kind);
+    }
+
     /** 本程序写入的渲染目标（来自 DRAWBUFFERS/RENDERTARGETS）。 */
     public java.util.Set<LuminTargetId> drawTargets() {
         return drawTargets;
@@ -59,11 +77,11 @@ public final class LuminProgramSource {
     }
 
     public LuminProgramSource withEnabled(boolean value) {
-        return new LuminProgramSource(id, sources, drawTargets, value);
+        return new LuminProgramSource(id, sources, paths, drawTargets, value);
     }
 
     public LuminProgramSource withDrawTargets(java.util.Set<LuminTargetId> value) {
-        return new LuminProgramSource(id, sources, value, enabled);
+        return new LuminProgramSource(id, sources, paths, value, enabled);
     }
 
     @Override
