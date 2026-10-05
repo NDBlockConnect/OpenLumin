@@ -214,12 +214,23 @@ clear images → shadow compute → setup(compute) → begin → shadow → prep
   实现期修复 4 个真实缺陷（include 图覆盖面、缺失 include 未报告、续行空白、属性去引号），
   详见 `memory/FACT.md` 的「WP-2 M1 解析层落地」节；另确认**维度文件夹变体共享程序标识**
   （按维度在编译期选择）这一语义细节。
-- **M2（纯 CPU）**：`PassGraph` 构建（依赖推导、hazard 分析、拓扑序）+ 与 Iris 默认时序的
-  **等价性验证**（同包语义下拓扑序必须能复现 Iris 固定序）；
-- **M3（平台层）**：`ShaderpackIR`+`PassGraph` → `LuminRenderPipelines` 编译（26.1.2 GL 先行）；
+- **M2（纯 CPU）** ✅ **已实现（2026-09-17，提交 41ebf3e）**：`PassGraph` 构建（依赖推导、hazard
+  分析、拓扑序）+ 与 Iris 默认时序的**等价性验证**（同包语义下拓扑序必须能复现 Iris 固定序）；
+- **预处理层（第 2 层）** ✅ **已实现（2026-10-05，提交 4595489）**：`ShaderpackPreprocessor`——
+  include 展开（include guard 无效语义回归锁定）、`#version/#extension` 顶部回填（含冲突检测）、
+  选项/环境 define 注入；`ShaderpackIR` 携带 include 图、`LuminProgramSource` 记录阶段源路径；
+- **M3（平台层）** ✅ **首片（2026-10-05，提交 8cb6e12/6304818/4595489）**：
+  `ShaderpackIR`+`PassGraph` → 逐程序 `RenderPipeline`（26.1.2 GL 先行）。合成族 pass 采用
+  引擎全屏三角形约定（`gl_VertexID`、EMPTY+TRIANGLES，与 vanilla `minecraft:core/screenquad`
+  同构）；缺 vsh 的包回退内建 `openlumin:shaderpack/_fullscreen`；部署源经预处理（include 展开 +
+  版本回填）；blend 指令 int 编码 → 26.1.2 枚举。**compute 程序显式延后**（26.1.2 pipeline 包
+  无计算管线抽象，javap 实证）；几何 pass 延后至 M7（WP-1 接线）；
 - **M4（平台层）**：资源模型（colortex/depthtex/shadowtex + 乒乓 + 清屏批处理）+ 默认帧序执行；
 - **M5（平台层）**：阴影 pass（正交 + 吸附 + 三种剔除档）；
-- **M6（平台层）**：能力旗标协商 + 诊断（解析期错误定位、运行期 pass 追踪）；
+- **M6（能力协商核心）** ✅ **已实现（2026-10-05，提交 f35e480）**：纯 CPU
+  `LuminCapabilityNegotiator`（required 缺失 → 明确拒绝并列出旗标，绝不静默降级；optional
+  拆分为 provided/unavailable），26.1.2 编译器接入（拒绝即无管线 + ERROR 诊断）；
+  **运行期 pass 追踪与解析期错误定位增强待做**；
 - **M7（集成）**：与 WP-1 地形/实体接线 + `LuminUpscaleInputs` 填充（§8）+ 26.2 Vulkan 跟进。
 
 ## 11. 验收 / Acceptance
