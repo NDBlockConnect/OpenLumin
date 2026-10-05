@@ -22,6 +22,10 @@ import io.github.openlumin.shaderpack.graph.LuminPassNode;
 import io.github.openlumin.shaderpack.graph.LuminResourceId;
 import io.github.openlumin.shaderpack.graph.PassGraph;
 import io.github.openlumin.shaderpack.parse.ShaderpackPreprocessor;
+import io.github.openlumin.shaderpack.plan.LuminFramePlan;
+import io.github.openlumin.shaderpack.plan.LuminFramePlanner;
+import io.github.openlumin.shaderpack.plan.LuminResourcePlan;
+import io.github.openlumin.shaderpack.plan.LuminResourcePlanner;
 import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
@@ -108,7 +112,9 @@ public final class LuminShaderpackCompiler {
                     "pack contains parse errors; refusing to compile ("
                             + ir.errors().size() + " error(s))"));
             return new CompiledShaderpack(ir, graph, Map.of(), List.of(),
-                    Map.of(), LuminCapabilityReport.notNegotiated(), diagnostics);
+                    Map.of(), new LuminResourcePlan(Map.of(), List.of()),
+                    new LuminFramePlan(List.of()),
+                    LuminCapabilityReport.notNegotiated(), diagnostics);
         }
 
         // WP-2 M6：能力协商先行——required 缺失即明确拒绝（设计 §5，不静默降级）
@@ -121,7 +127,9 @@ public final class LuminShaderpackCompiler {
                             + capabilityReport.missingRequired()
                             + "; refusing to compile (" + capabilityReport.describe() + ")"));
             return new CompiledShaderpack(ir, graph, Map.of(), List.of(),
-                    Map.of(), capabilityReport, diagnostics);
+                    Map.of(), new LuminResourcePlan(Map.of(), List.of()),
+                    new LuminFramePlan(List.of()),
+                    capabilityReport, diagnostics);
         }
 
         Map<LuminProgramId, RenderPipeline> pipelines = new LinkedHashMap<>();
@@ -160,8 +168,11 @@ public final class LuminShaderpackCompiler {
                                 + "' not compiled in M3 (deferred to WP-1 integration)"));
             }
         }
+        // WP-2 M4：资源计划 + 帧执行计划（清屏批次、乒乓绑定、屏障点）
+        LuminResourcePlan resourcePlan = LuminResourcePlanner.plan(ir, graph);
+        LuminFramePlan framePlan = LuminFramePlanner.plan(graph, resourcePlan);
         return new CompiledShaderpack(ir, graph, pipelines, executionOrder,
-                shaderResources, capabilityReport, diagnostics);
+                shaderResources, resourcePlan, framePlan, capabilityReport, diagnostics);
     }
 
     /** 合成族：全屏四边形 pass（非几何替换）。 */

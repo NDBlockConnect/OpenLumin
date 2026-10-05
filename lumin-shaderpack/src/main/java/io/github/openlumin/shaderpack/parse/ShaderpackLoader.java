@@ -340,7 +340,7 @@ public final class ShaderpackLoader {
         Map<LuminProgramId, LuminPackDirectives.ViewportScale> scales = new LinkedHashMap<>();
         Map<LuminProgramId, LuminPackDirectives.BlendOverride> blends = new LinkedHashMap<>();
         Map<LuminProgramId, Float> alphaTests = new LinkedHashMap<>();
-        Map<String, float[]> bufferSizes = new LinkedHashMap<>();
+        Map<String, LuminPackDirectives.BufferSize> bufferSizes = new LinkedHashMap<>();
         Map<String, String> samplerTextures = new LinkedHashMap<>();
 
         for (String key : properties.keys()) {
@@ -362,7 +362,7 @@ public final class ShaderpackLoader {
             }
             if (lower.startsWith("size.buffer.")) {
                 String buffer = lower.substring("size.buffer.".length());
-                float[] size = parseSize(value);
+                LuminPackDirectives.BufferSize size = parseBufferSize(value);
                 if (size != null) {
                     bufferSizes.put(buffer, size);
                 }
@@ -442,7 +442,11 @@ public final class ShaderpackLoader {
         };
     }
 
-    private static float[] parseSize(String value) {
+    /**
+     * 解析 {@code size.buffer} 值：**含小数点 → 相对**（屏幕倍数），不含 → 绝对像素
+     * （与 Iris {@code TextureScaleOverride} 语义一致；X/Y 独立判定）。
+     */
+    private static LuminPackDirectives.BufferSize parseBufferSize(String value) {
         if (value == null) {
             return null;
         }
@@ -451,7 +455,11 @@ public final class ShaderpackLoader {
             return null;
         }
         try {
-            return new float[]{Float.parseFloat(parts[0]), Float.parseFloat(parts[1])};
+            boolean widthRelative = parts[0].contains(".");
+            boolean heightRelative = parts[1].contains(".");
+            return new LuminPackDirectives.BufferSize(
+                    Float.parseFloat(parts[0]), Float.parseFloat(parts[1]),
+                    widthRelative, heightRelative);
         } catch (NumberFormatException ignored) {
             return null;
         }

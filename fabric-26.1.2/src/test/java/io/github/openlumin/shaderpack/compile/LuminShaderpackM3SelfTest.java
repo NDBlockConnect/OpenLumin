@@ -44,6 +44,7 @@ public final class LuminShaderpackM3SelfTest {
         section("geometry pass deferred", LuminShaderpackM3SelfTest::testGeometryDeferred);
         section("capability rejection wired", LuminShaderpackM3SelfTest::testCapabilityRejection);
         section("capability optional split wired", LuminShaderpackM3SelfTest::testCapabilityOptionalSplit);
+        section("resource/frame plan wired", LuminShaderpackM3SelfTest::testPlansWired);
         section("error pack refused", LuminShaderpackM3SelfTest::testErrorRefused);
         if (failures > 0) {
             System.err.println("[lumin-shaderpack M3] " + failures + " section(s) FAILED");
@@ -261,5 +262,24 @@ public final class LuminShaderpackM3SelfTest {
         check(compiled.capabilityReport().unavailableOptional().contains(
                         io.github.openlumin.shaderpack.LuminFeatureFlag.CUSTOM_IMAGES),
                 "unsupported optional must be marked unavailable");
+    }
+
+    /** 编译产物必须携带资源计划与帧计划（M4 规划层接线）。 */
+    private static void testPlansWired() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("shaders/gbuffers_terrain.fsh", "/* DRAWBUFFERS:0 */\nvoid main(){}\n");
+        files.put("shaders/composite1.fsh", "/* DRAWBUFFERS:0 */\nvoid main(){}\n");
+        files.put("shaders/final.fsh", "/* DRAWBUFFERS:0 */\nvoid main(){}\n");
+        CompiledShaderpack compiled = compile(files);
+        check(compiled.resourcePlan().allocation(
+                        io.github.openlumin.shaderpack.LuminTargetId.color(0)) != null,
+                "colortex0 allocation must be planned");
+        check(compiled.framePlan().passSteps().size() == 3,
+                "frame plan must cover all three passes, got "
+                        + compiled.framePlan().passSteps().size());
+        check(compiled.framePlan().steps().stream()
+                        .anyMatch(step -> step instanceof
+                                io.github.openlumin.shaderpack.plan.LuminFramePlan.ClearStep),
+                "frame plan must start with clear steps");
     }
 }

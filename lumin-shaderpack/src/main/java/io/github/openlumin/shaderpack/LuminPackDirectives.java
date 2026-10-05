@@ -29,6 +29,33 @@ public final class LuminPackDirectives {
     public record BlendOverride(boolean enabled, int sourceFactor, int destinationFactor) {
     }
 
+    /**
+     * 缓冲尺寸覆盖（{@code size.buffer.<buffer> = <w> <h>}）。
+     *
+     * <p><b>相对/绝对判定与 Iris 一致</b>（取证：Iris {@code TextureScaleOverride}）：
+     * 数值**含小数点则为相对**（屏幕尺寸的倍数），不含小数点则为**绝对像素**；
+     * X/Y 两轴可各自独立。</p>
+     */
+    public record BufferSize(float width, float height,
+                             boolean widthRelative, boolean heightRelative) {
+        public BufferSize {
+            if (width < 0 || height < 0) {
+                throw new IllegalArgumentException(
+                        "buffer size must be >= 0, got " + width + "x" + height);
+            }
+        }
+
+        /** 解析后宽度（基准 = 主目标宽）。 */
+        public int resolveWidth(int baseWidth) {
+            return Math.round(widthRelative ? baseWidth * width : width);
+        }
+
+        /** 解析后高度（基准 = 主目标高）。 */
+        public int resolveHeight(int baseHeight) {
+            return Math.round(heightRelative ? baseHeight * height : height);
+        }
+    }
+
     /** 阴影相关指令。 */
     public record ShadowDirectives(int resolution, boolean culling, float distance,
                                    boolean terrain, boolean entities, boolean player,
@@ -42,7 +69,7 @@ public final class LuminPackDirectives {
     private final Map<LuminProgramId, ViewportScale> viewportScales;
     private final Map<LuminProgramId, BlendOverride> blendOverrides;
     private final Map<LuminProgramId, Float> alphaTests;
-    private final Map<String, float[]> bufferSizes;
+    private final Map<String, BufferSize> bufferSizes;
     private final ShadowDirectives shadow;
     private final Map<String, String> samplerTextures;
 
@@ -50,7 +77,7 @@ public final class LuminPackDirectives {
                                Map<LuminProgramId, ViewportScale> viewportScales,
                                Map<LuminProgramId, BlendOverride> blendOverrides,
                                Map<LuminProgramId, Float> alphaTests,
-                               Map<String, float[]> bufferSizes,
+                               Map<String, BufferSize> bufferSizes,
                                ShadowDirectives shadow,
                                Map<String, String> samplerTextures) {
         this.switches = Map.copyOf(switches);
@@ -89,8 +116,8 @@ public final class LuminPackDirectives {
         return alphaTests.get(program);
     }
 
-    /** 缓冲尺寸覆盖（{@code size.buffer.<buffer>}）。 */
-    public float[] bufferSize(String buffer) {
+    /** 缓冲尺寸覆盖（{@code size.buffer.<buffer>}）；未声明返回 null。 */
+    public BufferSize bufferSize(String buffer) {
         return bufferSizes.get(buffer);
     }
 
@@ -115,7 +142,7 @@ public final class LuminPackDirectives {
         return alphaTests;
     }
 
-    public Map<String, float[]> bufferSizes() {
+    public Map<String, BufferSize> bufferSizes() {
         return bufferSizes;
     }
 
